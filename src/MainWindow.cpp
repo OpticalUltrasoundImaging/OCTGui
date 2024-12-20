@@ -58,6 +58,8 @@ MainWindow::MainWindow()
 
     connect(m_frameController, &FrameController::posChanged, this,
             &MainWindow::loadFrame);
+
+    menuBar()->addMenu(m_frameController->menu());
   }
 }
 
