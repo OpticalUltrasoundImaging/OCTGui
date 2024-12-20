@@ -181,7 +181,17 @@ void MainWindow::loadFrame(size_t i) {
       img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize);
       elapsedRecon = timeitRecon.get_ms();
     }
-    m_imageDisplay->imshow(matToQPixmap(img));
+
+    cv::Mat_<uint8_t> imgRadial;
+    float elapsedRadial{};
+    {
+      TimeIt timeit;
+      makeRadialImage(img, imgRadial);
+      elapsedRadial = timeit.get_ms();
+    }
+
+    // m_imageDisplay->imshow(matToQPixmap(img));
+    m_imageDisplay->imshow(matToQPixmap(imgRadial));
 
     auto elapsedTotal = timeit.get_ms();
     auto msg =

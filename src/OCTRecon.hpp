@@ -9,6 +9,8 @@
 #include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <opencv2/core.hpp>
+#include <opencv2/core/base.hpp>
 #include <opencv2/opencv.hpp>
 #include <span>
 #include <vector>
@@ -224,6 +226,26 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
   cv::Mat_<uint8_t> outmat;
   mat.convertTo(outmat, CV_8U);
   return mat;
+}
+
+inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
+                            int padTop = 625) {
+
+  const int dim = std::min(in.rows, in.cols);
+  const cv::Size dsize{dim, dim};
+  const double radius = dim / 2;
+  const cv::Point2f center(radius, radius);
+
+  const int flags = cv::WARP_FILL_OUTLIERS + cv::WARP_INVERSE_MAP;
+
+  if (padTop != 0) {
+    cv::copyMakeBorder(in, out, padTop, 0, 0, 0, cv::BORDER_CONSTANT);
+    cv::warpPolar(out.t(), out, dsize, center, radius,
+                  flags); // linear Polar, 3
+  } else {
+    cv::warpPolar(in.t(), out, dsize, center, radius,
+                  flags); // linear Polar, 3
+  }
 }
 
 } // namespace OCT
