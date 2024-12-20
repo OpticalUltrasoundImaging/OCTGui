@@ -190,11 +190,11 @@ void MainWindow::loadFrame(size_t i) {
     if (save) {
       {
         auto outpath = m_exportDir / fmt::format("rect-{:03}.tiff", i);
-        cv::imwrite(outpath.c_str(), img);
+        cv::imwrite(outpath.string(), img);
       }
       {
         auto outpath = m_exportDir / fmt::format("radial-{:03}.tiff", i);
-        cv::imwrite(outpath.c_str(), imgRadial);
+        cv::imwrite(outpath.string(), imgRadial);
       }
     }
 
