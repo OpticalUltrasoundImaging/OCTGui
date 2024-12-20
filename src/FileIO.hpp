@@ -82,7 +82,8 @@ struct DatReader {
   // Read `frameIdx` into buffer `dst`
   [[nodiscard]] inline std::optional<std::string>
   read(size_t frameStartIdx, size_t numFrames, std::span<T> dst) const {
-    assert((frameStartIdx + numFrames) < framesPerFile * files.size());
+    assert(numFrames >= 1);
+    assert((frameStartIdx + numFrames) <= framesPerFile * files.size());
     assert(dst.size() >= samplesPerFrame());
 
     const auto fileIdx = frameStartIdx / framesPerFile;
