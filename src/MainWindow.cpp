@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -80,17 +81,6 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
   }
 }
 
-auto getDirectoryName(const fs::path &path) {
-  std::string name;
-  if (fs::is_directory(path)) {
-    name = path.filename().string();
-    if (name.empty()) {
-      name = path.parent_path().filename().string();
-    }
-  }
-  return name;
-}
-
 void MainWindow::dropEvent(QDropEvent *event) {
   const auto *mimeData = event->mimeData();
   if (mimeData->hasUrls()) {
@@ -146,6 +136,11 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
     m_frameController->setSize(m_datReader->size());
     m_frameController->setPos(0);
 
+    m_exportDir = QStringToStdPath(QStandardPaths::writableLocation(
+                      QStandardPaths::DesktopLocation)) /
+                  m_datReader->seq;
+    fs::create_directories(m_exportDir);
+
     loadFrame(0);
 
   } else {
@@ -153,6 +148,7 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
         QString("Failed to load dat directory ") + QString(dir.c_str());
     statusBar()->showMessage(msg, statusTimeoutMs);
 
+    m_exportDir.clear();
     m_datReader = nullptr;
   }
 }
@@ -188,6 +184,18 @@ void MainWindow::loadFrame(size_t i) {
       TimeIt timeit;
       makeRadialImage(img, imgRadial);
       elapsedRadial = timeit.get_ms();
+    }
+
+    bool save = true;
+    if (save) {
+      {
+        auto outpath = m_exportDir / fmt::format("rect-{:03}.tiff", i);
+        cv::imwrite(outpath.c_str(), img);
+      }
+      {
+        auto outpath = m_exportDir / fmt::format("radial-{:03}.tiff", i);
+        cv::imwrite(outpath.c_str(), imgRadial);
+      }
     }
 
     cv::Mat_<uint8_t> combined(imgRadial.rows, imgRadial.cols + img.cols);

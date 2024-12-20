@@ -12,6 +12,7 @@
 #include <QEvent>
 #include <QMainWindow>
 #include <QMenu>
+#include <filesystem>
 #include <memory>
 
 namespace OCT {
@@ -36,6 +37,8 @@ private:
   std::unique_ptr<Calibration<Float>> m_calib;
   std::unique_ptr<RingBufferOfVec<uint16_t>>
       m_ringBuffer; // ring buffer for reading fringes
+
+  fs::path m_exportDir;
 
   void tryLoadCalibDirectory(const fs::path &calibDir);
   void tryLoadDatDirectory(const fs::path &dir);
