@@ -38,12 +38,19 @@ struct DatReader {
         }
       }
 
-      determineFrameSize();
+      if (!files.empty()) {
+        determineFrameSize();
+      }
+
     } catch (const fs::filesystem_error &e) {
       std::cerr << "Filesystem error: " << e.what() << '\n';
     } catch (const std::exception &e) {
       std::cerr << "Exception: " << e.what() << '\n';
     }
+  }
+
+  [[nodiscard]] bool ok() const {
+    return !files.empty() && framesPerFile != 0 && linesPerFrame != 0;
   }
 
   explicit DatReader(const std::span<const fs::path> files)
@@ -79,7 +86,7 @@ struct DatReader {
     frameStartIdx = frameStartIdx % framesPerFile;
     const std::streamsize offset = frameStartIdx * frameSizeBytes();
 
-    std::ifstream fs(files[fileIdx]);
+    std::ifstream fs(files[fileIdx], std::ios::binary);
     fs.seekg(offset);
     fs.read(reinterpret_cast<char *>(dst.data()), frameSizeBytes());
   }

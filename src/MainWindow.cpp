@@ -1,23 +1,64 @@
 #include "MainWindow.hpp"
 #include "FileIO.hpp"
+#include "FrameController.hpp"
+#include "OCTRecon.hpp"
+#include "ReconWorker.hpp"
 #include "strOps.hpp"
+#include "timeit.hpp"
+#include <QDockWidget>
 #include <QFileInfo>
+#include <QLabel>
 #include <QMenuBar>
 #include <QMimeData>
 #include <QStatusBar>
+#include <QVBoxLayout>
+#include <algorithm>
 #include <filesystem>
+#include <fmt/format.h>
+#include <opencv2/opencv.hpp>
 
 namespace OCT {
 
 MainWindow::MainWindow()
     : m_menuFile(menuBar()->addMenu("&File")),
-      m_menuView(menuBar()->addMenu("&View")) {
+      m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
+      m_frameController(new FrameController) {
 
+  // Configure MainWindow
+  // --------------------
   // Enable status bar
   statusBar();
 
   // Enable drag and drop
   setAcceptDrops(true);
+
+  // Define GUI
+  // ----------
+
+  // Central widget
+  // --------------
+  auto *centralWidget = new QWidget;
+  setCentralWidget(centralWidget);
+  auto *centralLayout = new QVBoxLayout;
+  centralWidget->setLayout(centralLayout);
+  centralLayout->addWidget(m_imageDisplay);
+  {
+    auto *label = new QLabel("Optical imaging!");
+    centralLayout->addWidget(label);
+  }
+
+  // Dock widgets
+  // ------------
+  {
+    auto *dock = new QDockWidget("Frames");
+    this->addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+
+    dock->setWidget(m_frameController);
+
+    connect(m_frameController, &FrameController::posChanged, this,
+            &MainWindow::loadFrame);
+  }
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -53,7 +94,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
 
       } else {
         // Dat sequence directory
-        m_datReader = std::make_unique<DatReader>(stdPath);
+        tryLoadDatDirectory(stdPath);
       }
     }
   }
@@ -66,17 +107,67 @@ void MainWindow::tryLoadCalibDirectory(const fs::path &calibDir) {
   constexpr int statusTimeoutMs = 5000;
 
   if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
-    m_calib = std::make_unique<Calibration<T>>(DatReader::ALineSize,
-                                               backgroundFile, phaseFile);
+    m_calib = std::make_unique<Calibration<Float>>(DatReader::ALineSize,
+                                                   backgroundFile, phaseFile);
 
     const auto msg =
         QString("Loaded calibration files from ") + QString(calibDir.c_str());
+
     statusBar()->showMessage(msg, statusTimeoutMs);
   } else {
     // TODO more logging
     const auto msg = QString("Failed to load calibration files from ") +
                      QString(calibDir.c_str());
     statusBar()->showMessage(msg, statusTimeoutMs);
+  }
+}
+
+void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
+  m_datReader = std::make_unique<DatReader>(dir);
+
+  constexpr int statusTimeoutMs = 5000;
+  if (m_datReader->ok()) {
+    const auto msg = QString("Loaded dat directory ") + QString(dir.c_str());
+    statusBar()->showMessage(msg, statusTimeoutMs);
+
+    m_frameController->setSize(m_datReader->size());
+    m_frameController->setPos(0);
+
+    loadFrame(0);
+
+  } else {
+    const auto msg =
+        QString("Failed to load dat directory ") + QString(dir.c_str());
+    statusBar()->showMessage(msg, statusTimeoutMs);
+
+    m_datReader = nullptr;
+  }
+}
+
+void MainWindow::loadFrame(size_t i) {
+  if (m_calib != nullptr) {
+    // Recon 1 frame
+    i = std::clamp<size_t>(i, 0, m_datReader->size());
+
+    TimeIt timeit;
+
+    std::vector<uint16_t> fringe(m_datReader->samplesPerFrame());
+    m_datReader->read(i, 1, fringe);
+    cv::Mat_<uint8_t> img;
+
+    float elapsedRecon{};
+    {
+      TimeIt timeitRecon;
+      img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize);
+      elapsedRecon = timeitRecon.get_ms();
+    }
+    m_imageDisplay->imshow(matToQPixmap(img));
+
+    auto elapsedTotal = timeit.get_ms();
+    auto msg =
+        fmt::format("Loaded frame {}/{}, recon {:.3f} ms, total {:.3f} ms", i,
+                    m_datReader->size(), elapsedRecon, elapsedTotal);
+    statusBar()->showMessage(QString::fromStdString(msg));
   }
 }
 

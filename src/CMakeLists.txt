@@ -3,6 +3,7 @@ set(EXE_NAME OCTGui)
 find_package(fmt CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)
+find_package(OpenCV CONFIG REQUIRED)
 find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Gui)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
@@ -29,24 +30,32 @@ add_definitions(-DQCUSTOMPLOT_USE_LIBRARY)
 
 
 qt_add_executable(${EXE_NAME}
-  main.cpp
-  MainWindow.hpp
-  MainWindow.cpp
-  FileIO.hpp
+    main.cpp
+    MainWindow.hpp
+    MainWindow.cpp
+    FileIO.hpp
+    ImageDisplay.hpp
+    ReconWorker.hpp
+    FrameController.hpp
 )
 
-set_target_properties(${EXE_NAME} PROPERTIES
+set_target_properties(${EXE_NAME} PROPERTIES 
     CXX_STANDARD 20
     CXX_EXTENSIONS OFF
 )
 
+target_include_directories(${EXE_NAME} PRIVATE
+  ${OpenCV_INCLUDE_DIRS}
+)
+
 target_link_libraries(${EXE_NAME} PRIVATE
-  fmt::fmt
-  Qt::Widgets
-  Qt::Gui
-  ${QCUSTOMPLOT_LIBRARY}
-  FFTW3::fftw3
-  FFTW3::fftw3f
+    fmt::fmt
+    Qt::Widgets
+    Qt::Gui
+    ${QCUSTOMPLOT_LIBRARY}
+    opencv_world
+    FFTW3::fftw3
+    FFTW3::fftw3f
 )
 
 # TODO: configure DAQ
