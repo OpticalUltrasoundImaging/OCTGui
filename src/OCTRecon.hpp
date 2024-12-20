@@ -216,7 +216,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
   {
     TimeIt timeit;
     static cv::Mat_<T> prevMat;
-    if (!prevMat.empty()) {
+    if (prevMat.cols == mat.cols && prevMat.rows == mat.rows) {
       int alignOffset = std::round(cvMod::phaseCorrelate(prevMat, mat).x);
       circshift(mat, alignOffset);
     }
