@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fftw.hpp"
+#include "phasecorr.hpp"
 #include "timeit.hpp"
 #include <cassert>
 #include <fftw3.h>
@@ -99,7 +100,7 @@ inline int getDistortionOffset(const cv::Mat &mat, int theoryWidth,
   firstStrip.convertTo(firstStrip, CV_32F);
   lastStrip.convertTo(lastStrip, CV_32F);
   return static_cast<int>(
-      std::round(cv::phaseCorrelate(firstStrip, lastStrip).x));
+      std::round(cvMod::phaseCorrelate(firstStrip, lastStrip).x));
 }
 
 inline void shiftXCircular(const cv::Mat &src, cv::Mat &dst, int shiftX) {
@@ -116,40 +117,6 @@ inline void shiftXCircular(const cv::Mat &src, cv::Mat &dst, int shiftX) {
 
   src(cv::Rect(width - shift, 0, shift, src.rows))
       .copyTo(dst(cv::Rect(0, 0, shift, src.rows)));
-}
-
-inline void shiftXCircularFFT(const cv::Mat &src, cv::Mat &dst, int shiftX) {
-  // Compute normalized frequency shift
-  cv::Mat planes[] = {cv::Mat_<float>(src), cv::Mat::zeros(src.size(), CV_32F)};
-  cv::Mat complexI;
-  cv::merge(planes, 2, complexI); // Combine into a complex matrix
-
-  // Perform forward FFT
-  cv::dft(complexI, complexI, cv::DFT_COMPLEX_OUTPUT);
-
-  // Apply phase shift
-  float phaseShift = -2.0f * CV_PI * shiftX / src.cols;
-  for (int i = 0; i < complexI.rows; i++) {
-    for (int j = 0; j < complexI.cols; j++) {
-      float phase = phaseShift * j;
-      float cosPhase = std::cos(phase);
-      float sinPhase = std::sin(phase);
-
-      cv::Vec2f &val = complexI.at<cv::Vec2f>(i, j);
-      float real = val[0];
-      float imag = val[1];
-
-      val[0] = real * cosPhase - imag * sinPhase;
-      val[1] = real * sinPhase + imag * cosPhase;
-    }
-  }
-
-  // Perform inverse FFT
-  cv::idft(complexI, complexI, cv::DFT_REAL_OUTPUT);
-  cv::split(complexI, planes);
-
-  // Normalize and return the result
-  planes[0].convertTo(dst, src.type());
 }
 
 template <typename T> inline void circshift(cv::Mat_<T> &mat, int idx) {
@@ -246,8 +213,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
     TimeIt timeit;
     static cv::Mat_<T> prevMat;
     if (!prevMat.empty()) {
-      int alignOffset = std::round(cv::phaseCorrelate(prevMat, mat).x);
-      // shiftXCircular(mat, mat, alignOffset);
+      int alignOffset = std::round(cvMod::phaseCorrelate(prevMat, mat).x);
       circshift(mat, alignOffset);
     }
     mat.copyTo(prevMat);
