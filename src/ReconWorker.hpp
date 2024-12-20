@@ -31,7 +31,7 @@ public:
 
 public slots:
   void setCalibration(std::shared_ptr<Calibration<Float>> calibration) {
-    calibration = std::move(calibration);
+    this->calibration = std::move(calibration);
   }
   void setALineSize(size_t ALineSize) { this->ALineSize = ALineSize; }
   void setShouldStop(bool shouldStop) { this->shouldStop = shouldStop; }
