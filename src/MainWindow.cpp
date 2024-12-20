@@ -78,6 +78,17 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
   }
 }
 
+auto getDirectoryName(const fs::path &path) {
+  std::string name;
+  if (fs::is_directory(path)) {
+    name = path.filename().string();
+    if (name.empty()) {
+      name = path.parent_path().filename().string();
+    }
+  }
+  return name;
+}
+
 void MainWindow::dropEvent(QDropEvent *event) {
   const auto *mimeData = event->mimeData();
   if (mimeData->hasUrls()) {
@@ -87,7 +98,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
     if (fs::is_directory(stdPath)) {
       // Check if it is a calibration directory (a directory that contains
       // "SSOCTBackground.txt" and "SSOCTCalibration180MHZ.txt")
-      const auto dirName = toLower(stdPath.stem().string());
+      const auto dirName = toLower(getDirectoryName(stdPath));
       if (dirName.find("calib") != std::string::npos) {
 
         tryLoadCalibDirectory(stdPath);

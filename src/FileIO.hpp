@@ -82,7 +82,7 @@ struct DatReader {
   // Read `frameIdx` into buffer `dst`
   [[nodiscard]] inline std::optional<std::string>
   read(size_t frameStartIdx, size_t numFrames, std::span<T> dst) const {
-    assert(frameStartIdx >= 0 && frameStartIdx < framesPerFile * files.size());
+    assert((frameStartIdx + numFrames) < framesPerFile * files.size());
     assert(dst.size() >= samplesPerFrame());
 
     const auto fileIdx = frameStartIdx / framesPerFile;
@@ -95,8 +95,9 @@ struct DatReader {
     fs.read(reinterpret_cast<char *>(dst.data()), frameSizeBytes());
 
     if (fs.eof()) {
-      return fmt::format("EOF reached while reading {}. Read {}/{} bytes",
-                         path.string(), fs.gcount(), frameSizeBytes());
+      return fmt::format("EOF reached while reading {}. Read {}/{} bytes. "
+                         "Attempted to seek to {}",
+                         path.string(), fs.gcount(), frameSizeBytes(), offset);
     }
     if (fs.fail()) {
       return fmt::format("Error: Read failed (failbit set) while reading {}",
@@ -116,24 +117,24 @@ private:
   // Checks the size of the first file to set `framesPerFile` and `linesPerFile`
   void determineFrameSize() {
     if (!files.empty()) {
-      const auto fileSize = fs::file_size(files[0]);
+      const auto samples = fs::file_size(files[0]) / sizeof(T);
 
       // Invivo probe acquires 2200 Ascans per Bscan
       // Exvivo probe acquires 2500 Ascans per Bscan
-      if ((fileSize % ALineSize) == 0) {
-        const auto totalLines = fileSize / ALineSize;
-        if ((fileSize % 2500) == 0) {
+      if ((samples % ALineSize) == 0) {
+        const auto totalLines = samples / ALineSize;
+        if ((samples % 2500) == 0) {
           // Ex vivo probe data
           linesPerFrame = 2500;
           framesPerFile = totalLines / linesPerFrame;
         }
-        if ((fileSize % 2200) == 0) {
+        if ((samples % 2200) == 0) {
           // In vivo probe data
           linesPerFrame = 2200;
           framesPerFile = totalLines / linesPerFrame;
         }
       } else {
-        std::cerr << "Invalid file size: " << fileSize
+        std::cerr << "Invalid file size: " << samples
                   << ", not divisible by A line size " << ALineSize << ".\n";
       }
     }
