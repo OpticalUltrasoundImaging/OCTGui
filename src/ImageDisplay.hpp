@@ -14,8 +14,7 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
-#include <qevent.h>
-#include <qnamespace.h>
+#include <qgraphicsview.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -54,9 +53,16 @@ public:
     m_PixmapItem = m_Scene->addPixmap(m_Pixmap);
     m_PixmapItem->setZValue(-1);
 
+    if (m_resetZoomOnNext) {
+      scaleToSize();
+      m_resetZoomOnNext = false;
+    }
+
     // TODO overlay
   }
   void imshow(const QImage &img) { imshow(QPixmap::fromImage(img)); }
+
+  void resetZoomOnNext() { m_resetZoomOnNext = true; }
 
   void scaleToSize() {
     updateMinScaleFactor();
@@ -76,7 +82,6 @@ protected:
       constexpr double sensitivity = 0.1;
       const double scaleFactor = 1.0 - numSteps * sensitivity;
       const auto &evPos = event->position();
-      // const auto pos = mapToScene(QPoint{(int)evPos.x(), (int)evPos.y()});
       m_scaleFactor = std::max(m_scaleFactor * scaleFactor, m_scaleFactorMin);
 
       updateTransform();
@@ -123,12 +128,16 @@ private:
   QPoint m_lastPanPoint{};
   QCursor m_lastPanCursor{};
 
+  bool m_resetZoomOnNext{true};
+
   void updateTransform() {
     m_transform = QTransform();
     m_transform.scale(m_scaleFactor, m_scaleFactor);
 
+    const auto anchor = transformationAnchor();
     setTransformationAnchor(AnchorUnderMouse);
     setTransform(m_transform);
+    setTransformationAnchor(anchor);
   }
 
   void updateMinScaleFactor() {
