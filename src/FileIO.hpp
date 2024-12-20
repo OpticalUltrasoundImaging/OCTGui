@@ -14,6 +14,8 @@ namespace OCT {
 
 namespace fs = std::filesystem;
 
+// Get the directory name if path (which must be a directory).
+// Handles trailing slashes
 [[nodiscard]] inline std::string getDirectoryName(const fs::path &path) {
   std::string name;
   if (fs::is_directory(path)) {

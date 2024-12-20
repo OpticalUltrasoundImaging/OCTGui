@@ -85,18 +85,20 @@ void MainWindow::dropEvent(QDropEvent *event) {
   const auto *mimeData = event->mimeData();
   if (mimeData->hasUrls()) {
     const auto &urls = mimeData->urls();
-    const auto stdPath = QStringToStdPath(urls[0].toLocalFile());
+    const auto stdPath = toPath(urls[0].toLocalFile());
 
     if (fs::is_directory(stdPath)) {
-      // Check if it is a calibration directory (a directory that contains
-      // "SSOCTBackground.txt" and "SSOCTCalibration180MHZ.txt")
-      const auto dirName = toLower(getDirectoryName(stdPath));
+
+      auto dirName = getDirectoryName(stdPath);
+      toLower_(dirName);
       if (dirName.find("calib") != std::string::npos) {
+        // Check if it is a calibration directory (a directory that contains
+        // "SSOCTBackground.txt" and "SSOCTCalibration180MHZ.txt")
 
+        // Load calibration files
         tryLoadCalibDirectory(stdPath);
-
       } else {
-        // Dat sequence directory
+        // Load Dat sequence directory
         tryLoadDatDirectory(stdPath);
       }
     }
@@ -113,14 +115,15 @@ void MainWindow::tryLoadCalibDirectory(const fs::path &calibDir) {
     m_calib = std::make_unique<Calibration<Float>>(DatReader::ALineSize,
                                                    backgroundFile, phaseFile);
 
+    ;
     const auto msg =
-        QString("Loaded calibration files from ") + QString(calibDir.c_str());
+        QString("Loaded calibration files from ") + toQString(calibDir);
 
     statusBar()->showMessage(msg, statusTimeoutMs);
   } else {
     // TODO more logging
     const auto msg = QString("Failed to load calibration files from ") +
-                     QString(calibDir.c_str());
+                     QString::fromStdString(calibDir.string());
     statusBar()->showMessage(msg, statusTimeoutMs);
   }
 }
@@ -130,13 +133,13 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
 
   constexpr int statusTimeoutMs = 5000;
   if (m_datReader->ok()) {
-    const auto msg = QString("Loaded dat directory ") + QString(dir.c_str());
+    const auto msg = QString("Loaded dat directory ") + toQString(dir);
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_frameController->setSize(m_datReader->size());
     m_frameController->setPos(0);
 
-    m_exportDir = QStringToStdPath(QStandardPaths::writableLocation(
+    m_exportDir = toPath(QStandardPaths::writableLocation(
                       QStandardPaths::DesktopLocation)) /
                   m_datReader->seq;
     fs::create_directories(m_exportDir);
@@ -144,8 +147,7 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
     loadFrame(0);
 
   } else {
-    const auto msg =
-        QString("Failed to load dat directory ") + QString(dir.c_str());
+    const auto msg = QString("Failed to load dat directory ") + toQString(dir);
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_exportDir.clear();
