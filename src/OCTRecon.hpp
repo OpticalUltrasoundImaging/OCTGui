@@ -76,6 +76,20 @@ template <Floating T> struct ScanConversionParams {
   T brightness;
 };
 
+template <typename T>
+void logCompress(uint8_t *outptr, size_t imageDepth, fftw::Complex<T> *cx,
+                 T contrast, T brightness) {
+  for (size_t i = 0; i < imageDepth; ++i) {
+    const auto ro = cx[i][0];
+    const auto io = cx[i][1];
+
+    T val = ro * ro + io * io;
+    val = contrast * (10 * log10(val) + brightness);
+    val = val < 0 ? 0 : val > 255 ? 255 : val;
+    outptr[i] = static_cast<uint8_t>(val);
+  }
+}
+
 template <Floating T>
 [[nodiscard]] cv::Mat_<uint8_t>
 reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
@@ -128,15 +142,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
 
       // 4. Copy result into image
       uint8_t *outptr = mat.ptr(j);
-      for (size_t i = 0; i < imageDepth; ++i) {
-        const auto ro = fftBuf.out[i][0];
-        const auto io = fftBuf.out[i][1];
-
-        T val = ro * ro + io * io;
-        val = contrast * (10 * log10(val) + brightness);
-        val = val < 0 ? 0 : val > 255 ? 255 : val;
-        outptr[i] = static_cast<uint8_t>(val);
-      }
+      logCompress<T>(outptr, imageDepth, fftBuf.out, contrast, brightness);
     }
   });
 
