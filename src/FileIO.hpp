@@ -18,9 +18,9 @@ namespace fs = std::filesystem;
   std::string name;
   if (fs::is_directory(path)) {
     if (path.has_filename()) {
-      name = path.filename();
+      name = path.filename().string();
     } else if (path.has_parent_path() && path.parent_path().has_filename()) {
-      name = path.parent_path().filename();
+      name = path.parent_path().filename().string();
     }
   }
   return name;
