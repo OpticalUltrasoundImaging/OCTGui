@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifact
-          path: ${{ github.workspace }}/build/win64/src/Release/main.exe
+          path: ${{ github.workspace }}/build/win64/src/Release/OCTGui.exe
           if-no-files-found: "warn" # output a warning if no files are found.
           overwrite: true
 
@@ -125,6 +125,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifact
-          path: ${{ github.workspace }}/build/clang/src/Release/main
+          path: ${{ github.workspace }}/build/clang/src/Release/OCTGui
           if-no-files-found: "warn" # output a warning if no files are found.
           overwrite: true
