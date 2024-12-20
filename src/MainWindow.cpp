@@ -152,7 +152,14 @@ void MainWindow::loadFrame(size_t i) {
     TimeIt timeit;
 
     std::vector<uint16_t> fringe(m_datReader->samplesPerFrame());
-    m_datReader->read(i, 1, fringe);
+    auto err = m_datReader->read(i, 1, fringe);
+    if (err) {
+      auto msg = fmt::format("While loading {}/{}, got {}", i,
+                             m_datReader->size(), *err);
+      statusBar()->showMessage(QString::fromStdString(msg));
+      return;
+    }
+
     cv::Mat_<uint8_t> img;
 
     float elapsedRecon{};

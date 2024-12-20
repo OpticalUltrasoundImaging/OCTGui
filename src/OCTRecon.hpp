@@ -1,7 +1,6 @@
 #pragma once
 
 #include "fftw.hpp"
-#include <algorithm>
 #include <cassert>
 #include <fftw3.h>
 #include <filesystem>
@@ -71,20 +70,6 @@ template <Floating T> struct Calibration {
     readTextFileToArray<phaseCalibUnit<T>>(phaseFile, phaseCalib);
   }
 };
-
-// template <Floating T>
-// void log_transform(cv::Mat_<T> &mat, const T contrast, const T brightness) {
-//   const auto rows = mat.rows;
-//   const auto cols = mat.cols;
-//   const cv::Range range(0, rows);
-//   for (int j = range.start; j < range.end; ++j) {
-//     T *mem = reinterpret_cast<T *>(mat.ptr(j));
-//     for (size_t i = 0; i < cols; ++i) {
-//       auto val = contrast * (10 * std::log10(mem[i]) + brightness);
-//       mem[i] = std::clamp<T>(val, (T)0., (T)255.);
-//     }
-//   }
-// }
 
 template <Floating T> struct ScanConversionParams {
   T contrast;

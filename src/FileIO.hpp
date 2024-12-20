@@ -3,9 +3,12 @@
 #include <cassert>
 #include <exception>
 #include <filesystem>
+#include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <span>
+#include <string>
 
 namespace OCT {
 
@@ -77,8 +80,8 @@ struct DatReader {
   }
 
   // Read `frameIdx` into buffer `dst`
-  inline void read(size_t frameStartIdx, size_t numFrames,
-                   std::span<T> dst) const {
+  [[nodiscard]] inline std::optional<std::string>
+  read(size_t frameStartIdx, size_t numFrames, std::span<T> dst) const {
     assert(frameStartIdx >= 0 && frameStartIdx < framesPerFile * files.size());
     assert(dst.size() >= samplesPerFrame());
 
@@ -86,9 +89,27 @@ struct DatReader {
     frameStartIdx = frameStartIdx % framesPerFile;
     const std::streamsize offset = frameStartIdx * frameSizeBytes();
 
-    std::ifstream fs(files[fileIdx], std::ios::binary);
+    const auto &path = files[fileIdx];
+    std::ifstream fs(path, std::ios::binary);
     fs.seekg(offset);
     fs.read(reinterpret_cast<char *>(dst.data()), frameSizeBytes());
+
+    if (fs.eof()) {
+      return fmt::format("EOF reached while reading {}. Read {}/{} bytes",
+                         path.string(), fs.gcount(), frameSizeBytes());
+    }
+    if (fs.fail()) {
+      return fmt::format("Error: Read failed (failbit set) while reading {}",
+                         path.string());
+    }
+    if (fs.bad()) {
+      return fmt::format(
+          "Error: Critical I/O error (batbit set) while reading {}",
+          path.string());
+    }
+
+    // Successful
+    return std::nullopt;
   }
 
 private:
