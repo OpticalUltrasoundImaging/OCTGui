@@ -190,8 +190,13 @@ void MainWindow::loadFrame(size_t i) {
       elapsedRadial = timeit.get_ms();
     }
 
+    cv::Mat_<uint8_t> combined(imgRadial.rows, imgRadial.cols + img.cols);
+    imgRadial.copyTo(combined(cv::Rect(0, 0, imgRadial.cols, imgRadial.rows)));
+    img.copyTo(combined(cv::Rect(imgRadial.cols, 0, img.cols, img.rows)));
+
     // m_imageDisplay->imshow(matToQPixmap(img));
-    m_imageDisplay->imshow(matToQPixmap(imgRadial));
+    // m_imageDisplay->imshow(matToQPixmap(imgRadial));
+    m_imageDisplay->imshow(matToQPixmap(combined));
 
     auto elapsedTotal = timeit.get_ms();
     auto msg =

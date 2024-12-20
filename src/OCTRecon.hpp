@@ -232,8 +232,13 @@ inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
                             int padTop = 625) {
 
   const int dim = std::min(in.rows, in.cols);
-  const cv::Size dsize{dim, dim};
-  const double radius = dim / 2;
+
+  // const cv::Size dsize{dim, dim};
+  // const double radius = dim / 2;
+  // const cv::Point2f center(radius, radius);
+
+  const cv::Size dsize{dim * 2, dim * 2};
+  const double radius = dim;
   const cv::Point2f center(radius, radius);
 
   const int flags = cv::WARP_FILL_OUTLIERS + cv::WARP_INVERSE_MAP;
