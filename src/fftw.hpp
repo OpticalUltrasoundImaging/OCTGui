@@ -90,7 +90,8 @@ template <Floating T> inline constexpr const char *prefix = prefix_<T>::value;
     } else if constexpr (std::is_same_v<T, float>) {                           \
       return CONCAT(fftwf_, FUNC)(PARAMS_CALL);                                \
     } else {                                                                   \
-      static_assert(false, "Not implemented");                                 \
+      static_assert(std::is_same_v<T, double> || std::is_same_v<T, float>,     \
+                    "Not implemented");                                        \
     }                                                                          \
   }
 
@@ -109,7 +110,8 @@ TEMPLATIZE(void, destroy_plan, PlanT<T> plan, plan)
       } else if constexpr (std::is_same_v<T, float>) {                         \
         return CONCAT(fftwf_plan_, FUNC)(PARAMS_CALL);                         \
       } else {                                                                 \
-        static_assert(false, "Not supported");                                 \
+        static_assert(std::is_same_v<T, double> || std::is_same_v<T, float>,   \
+                      "Not supported");                                        \
       }                                                                        \
     }()};                                                                      \
     return planner;                                                            \
@@ -123,7 +125,8 @@ TEMPLATIZE(void, destroy_plan, PlanT<T> plan, plan)
     } else if constexpr (std::is_same_v<T, float>) {                           \
       CONCAT(fftwf_, FUNC)(plan, PARAMS_CALL);                                 \
     } else {                                                                   \
-      static_assert(false, "Not supported");                                   \
+      static_assert(std::is_same_v<T, double> || std::is_same_v<T, float>,     \
+                    "Not supported");                                          \
     }                                                                          \
   }
 
@@ -392,7 +395,8 @@ template <typename T> struct Plan {
     } else if constexpr (std::is_same_v<T, float>) {
       fftwf_execute(plan);
     } else {
-      static_assert(false, "Not supported");
+      static_assert(std::is_same_v<T, double> || std::is_same_v<T, float>,
+                    "Not supported");
     }
   }
 
@@ -728,9 +732,6 @@ void scale_and_magnitude_avx2(Complex<T> const *in, T *out, size_t const n,
       // store
       _mm256_store_pd(&out[i], mag);
     }
-
-  } else {
-    static_assert(false, "Not supported.");
   }
 
   for (; i < n; ++i) {
@@ -824,9 +825,6 @@ void scale_imag_and_magnitude_neon(T const *real, T const *imag, T fct,
       auto res = vsqrtq_f64(real_vec);
       vst1q_f64(&out[i], res);
     }
-
-  } else {
-    static_assert(false, "Not implemented.");
   }
 
   // Remaining
