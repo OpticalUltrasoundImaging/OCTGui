@@ -191,23 +191,25 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
 
   mat = mat.t();
 
-  // Resize to theoretical aline number
+  // Distortion correction and resize to theoretical aline number
   {
     TimeIt timeit;
 
     size_t theoreticalALines = nLines;
     if (nLines == 2500) {
-      theoreticalALines = 2234;
+      // theoreticalALines = 2234;
+      // Don't need distortion correction for the ex vivo probe.
     } else if (nLines == 2200) {
       theoreticalALines = 2000;
+
+      const cv::Size targetSize(theoreticalALines, mat.rows);
+      const int distOffset = getDistortionOffset(mat, theoreticalALines,
+                                                 nLines - theoreticalALines);
+      cv::resize(mat(cv::Rect(0, 0, theoreticalALines + distOffset, mat.rows)),
+                 mat, targetSize);
     }
 
-    const cv::Size targetSize(theoreticalALines, mat.rows);
-    const int distOffset =
-        getDistortionOffset(mat, theoreticalALines, nLines - theoreticalALines);
-    cv::resize(mat, mat, targetSize);
-
-    fmt::println("Distortion correction elapsed: {} ms", timeit.get_ms());
+    // fmt::println("Distortion correction elapsed: {} ms", timeit.get_ms());
   }
 
   // Align Bscans
@@ -220,7 +222,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
     }
     mat.copyTo(prevMat);
 
-    fmt::println("Distortion correction elapsed: {} ms", timeit.get_ms());
+    // fmt::println("Align correction elapsed: {} ms", timeit.get_ms());
   }
 
   cv::Mat_<uint8_t> outmat;

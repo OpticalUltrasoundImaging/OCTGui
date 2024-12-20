@@ -191,8 +191,15 @@ void MainWindow::loadFrame(size_t i) {
     }
 
     cv::Mat_<uint8_t> combined(imgRadial.rows, imgRadial.cols + img.cols);
+    // Copy radial to left side
     imgRadial.copyTo(combined(cv::Rect(0, 0, imgRadial.cols, imgRadial.rows)));
+    // Copy rect to top right
     img.copyTo(combined(cv::Rect(imgRadial.cols, 0, img.cols, img.rows)));
+
+    // Clear bottom right
+    combined(
+        cv::Rect(imgRadial.cols, img.rows, img.cols, combined.rows - img.rows))
+        .setTo(0);
 
     // m_imageDisplay->imshow(matToQPixmap(img));
     // m_imageDisplay->imshow(matToQPixmap(imgRadial));
