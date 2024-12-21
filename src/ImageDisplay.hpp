@@ -14,7 +14,6 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
-#include <qgraphicsview.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;

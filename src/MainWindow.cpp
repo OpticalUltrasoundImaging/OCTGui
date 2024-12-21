@@ -1,7 +1,9 @@
 #include "MainWindow.hpp"
+#include "ExportSettings.hpp"
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "OCTRecon.hpp"
+#include "Overlay.hpp"
 #include "ReconWorker.hpp"
 #include "strOps.hpp"
 #include "timeit.hpp"
@@ -10,6 +12,7 @@
 #include <QLabel>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QStackedLayout>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
@@ -23,7 +26,9 @@ namespace OCT {
 MainWindow::MainWindow()
     : m_menuFile(menuBar()->addMenu("&File")),
       m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
-      m_frameController(new FrameController) {
+      m_imageOverlay(new ImageOverlay(m_imageDisplay->viewport())),
+      m_frameController(new FrameController),
+      m_exportSettingsWidget(new ExportSettingsWidget) {
 
   // Configure MainWindow
   // --------------------
@@ -40,12 +45,15 @@ MainWindow::MainWindow()
   // --------------
   auto *centralWidget = new QWidget;
   setCentralWidget(centralWidget);
-  auto *centralLayout = new QVBoxLayout;
+  auto *centralLayout = new QStackedLayout;
   centralWidget->setLayout(centralLayout);
   centralLayout->addWidget(m_imageDisplay);
+
+  // Debug
   {
-    auto *label = new QLabel("Optical imaging!");
-    centralLayout->addWidget(label);
+    m_imageOverlay->setSequence("Sequence name");
+    m_imageOverlay->setSize(100);
+    m_imageOverlay->setIdx(50);
   }
 
   // Dock widgets
@@ -61,6 +69,14 @@ MainWindow::MainWindow()
             &MainWindow::loadFrame);
 
     menuBar()->addMenu(m_frameController->menu());
+  }
+  {
+    auto *dock = new QDockWidget("Export settings");
+    this->addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+
+    dock->setWidget(m_exportSettingsWidget);
+    menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
 }
 
@@ -133,17 +149,26 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
 
   constexpr int statusTimeoutMs = 5000;
   if (m_datReader->ok()) {
+
+    // Update status bar
     const auto msg = QString("Loaded dat directory ") + toQString(dir);
     statusBar()->showMessage(msg, statusTimeoutMs);
 
+    // Update image overlay sequence label
+    m_imageOverlay->setSequence(QString::fromStdString(m_datReader->seq));
+    m_imageOverlay->setSize(m_datReader->size());
+
+    // Update frame controller slider
     m_frameController->setSize(m_datReader->size());
     m_frameController->setPos(0);
 
+    // Set export directory
     m_exportDir = toPath(QStandardPaths::writableLocation(
                       QStandardPaths::DesktopLocation)) /
                   m_datReader->seq;
     fs::create_directories(m_exportDir);
 
+    // Load the first frame
     loadFrame(0);
 
   } else {
@@ -188,8 +213,8 @@ void MainWindow::loadFrame(size_t i) {
       elapsedRadial = timeit.get_ms();
     }
 
-    bool save = true;
-    if (save) {
+    const auto &settings = m_exportSettingsWidget->settings();
+    if (settings.saveImages) {
       {
         auto outpath = m_exportDir / fmt::format("rect-{:03}.tiff", i);
         cv::imwrite(outpath.string(), img);
@@ -214,12 +239,17 @@ void MainWindow::loadFrame(size_t i) {
     // m_imageDisplay->imshow(matToQPixmap(img));
     // m_imageDisplay->imshow(matToQPixmap(imgRadial));
     m_imageDisplay->imshow(matToQPixmap(combined));
+    m_imageOverlay->setIdx(i);
 
     auto elapsedTotal = timeit.get_ms();
     auto msg =
         fmt::format("Loaded frame {}/{}, recon {:.3f} ms, total {:.3f} ms", i,
                     m_datReader->size(), elapsedRecon, elapsedTotal);
     statusBar()->showMessage(QString::fromStdString(msg));
+  } else {
+    statusBar()->showMessage(
+        "Please load calibration files first by dropping a directory "
+        "containing the background and phase files into the GUI.");
   }
 }
 

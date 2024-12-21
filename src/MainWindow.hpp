@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Common.hpp"
+#include "ExportSettings.hpp"
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
 #include "OCTRecon.hpp"
+#include "Overlay.hpp"
 #include "RingBuffer.hpp"
 #include <QAction>
 #include <QDockwidget>
@@ -31,6 +33,7 @@ private:
   QMenu *m_menuView;
 
   ImageDisplay *m_imageDisplay;
+  ImageOverlay *m_imageOverlay;
   FrameController *m_frameController;
 
   std::unique_ptr<DatReader> m_datReader;
@@ -39,6 +42,7 @@ private:
       m_ringBuffer; // ring buffer for reading fringes
 
   fs::path m_exportDir;
+  ExportSettingsWidget *m_exportSettingsWidget;
 
   void tryLoadCalibDirectory(const fs::path &calibDir);
   void tryLoadDatDirectory(const fs::path &dir);

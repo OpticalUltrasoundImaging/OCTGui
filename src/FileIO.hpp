@@ -14,8 +14,6 @@ namespace OCT {
 
 namespace fs = std::filesystem;
 
-// Get the directory name if path (which must be a directory).
-// Handles trailing slashes
 [[nodiscard]] inline std::string getDirectoryName(const fs::path &path) {
   std::string name;
   if (fs::is_directory(path)) {
@@ -38,9 +36,9 @@ vivo probe acquires 2500 Ascans per frame.
  */
 struct DatReader {
   using T = uint16_t;
-  static constexpr size_t ALineSize = 2048 * 3;
+  static constexpr size_t ALineSize = 2048L * 3;
 
-  std::string seq{"unknown"};
+  std::string seq{"empty"};
   std::vector<fs::path> files;
   size_t framesPerFile{};
   size_t linesPerFrame{};

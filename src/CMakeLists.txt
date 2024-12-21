@@ -37,6 +37,8 @@ qt_add_executable(${EXE_NAME}
     ImageDisplay.hpp
     ReconWorker.hpp
     FrameController.hpp
+    ExportSettings.hpp
+    Overlay.hpp
 )
 
 set_target_properties(${EXE_NAME} PROPERTIES 
