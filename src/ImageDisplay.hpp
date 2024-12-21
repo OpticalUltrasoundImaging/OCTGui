@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Overlay.hpp"
 #include <QEvent>
 #include <QGraphicsItem>
 #include <QGraphicsScene>
@@ -7,6 +8,7 @@
 #include <QGraphicsSceneWheelEvent>
 #include <QGraphicsView>
 #include <QImage>
+#include <QPaintEvent>
 #include <QPainter>
 #include <QPixmap>
 #include <QScrollBar>
@@ -14,6 +16,7 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
+#include <qgraphicsview.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -25,7 +28,8 @@ public:
     bool rightButton{};
   };
 
-  ImageDisplay() : m_Scene(new QGraphicsScene) {
+  ImageDisplay()
+      : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())) {
     setBackgroundBrush(QBrush(Qt::black));
 
     setAlignment(Qt::AlignCenter);
@@ -41,7 +45,11 @@ public:
 
     setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     setScene(m_Scene);
+
+    m_overlay->hide();
   }
+
+  [[nodiscard]] auto overlay() { return m_overlay; }
 
   void imshow(const QPixmap &pixmap) {
     m_Pixmap = pixmap;
@@ -57,7 +65,8 @@ public:
       m_resetZoomOnNext = false;
     }
 
-    // TODO overlay
+    m_overlay->setImageSize(pixmap.size());
+    m_overlay->show();
   }
   void imshow(const QImage &img) { imshow(QPixmap::fromImage(img)); }
 
@@ -89,9 +98,15 @@ protected:
     }
   }
 
+  void paintEvent(QPaintEvent *event) override {
+    m_overlay->move(0, 0);
+    QGraphicsView::paintEvent(event);
+  }
+
   void resizeEvent(QResizeEvent *event) override {
     updateMinScaleFactor();
     QGraphicsView::resizeEvent(event);
+    m_overlay->resize(viewport()->size());
   }
 
   void mousePressEvent(QMouseEvent *event) override {
@@ -118,6 +133,7 @@ private:
   QGraphicsScene *m_Scene;
   QPixmap m_Pixmap;
   QGraphicsItem *m_PixmapItem{};
+  ImageOverlay *m_overlay;
 
   double m_scaleFactor{1.0};
   double m_scaleFactorMin{1.0};
@@ -137,6 +153,8 @@ private:
     setTransformationAnchor(AnchorUnderMouse);
     setTransform(m_transform);
     setTransformationAnchor(anchor);
+
+    m_overlay->setZoom(m_scaleFactor);
   }
 
   void updateMinScaleFactor() {

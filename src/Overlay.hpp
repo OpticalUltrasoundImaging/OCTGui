@@ -1,11 +1,14 @@
 #pragma once
 
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QSize>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <Qt>
+#include <qboxlayout.h>
+#include <qlabel.h>
 
 class OverlayWidget : public QWidget {
 public:
@@ -26,21 +29,22 @@ public:
 
     // UI
     // --
-    auto *grid = new QGridLayout;
-    setLayout(grid);
+    auto *hlayout = new QHBoxLayout;
+    auto *leftv = new QVBoxLayout;
+    auto *rightv = new QVBoxLayout;
+    hlayout->addLayout(leftv);
+    hlayout->addLayout(rightv);
+    setLayout(hlayout);
 
-    // Top left
-    m_topLeftLayout->setAlignment(Qt::AlignTop);
-    grid->addLayout(m_topLeftLayout, 0, 0);
-    // Top right
-    m_topRightLayout->setAlignment(Qt::AlignTop);
-    grid->addLayout(m_topRightLayout, 0, 1);
-    // Bottom left
-    m_bottomLeftLayout->setAlignment(Qt::AlignBottom);
-    grid->addLayout(m_bottomLeftLayout, 0, 0);
-    // Bottom right
-    m_bottomRightLayout->setAlignment(Qt::AlignBottom);
-    grid->addLayout(m_bottomRightLayout, 0, 1);
+    leftv->addLayout(m_topLeftLayout);
+    leftv->addLayout(m_bottomLeftLayout);
+    rightv->addLayout(m_topRightLayout);
+    rightv->addLayout(m_bottomRightLayout);
+
+    m_topLeftLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    m_topRightLayout->setAlignment(Qt::AlignTop | Qt::AlignRight);
+    m_bottomLeftLayout->setAlignment(Qt::AlignBottom | Qt::AlignLeft);
+    m_bottomRightLayout->setAlignment(Qt::AlignBottom | Qt::AlignRight);
   }
 
   QVBoxLayout *topLeftLayout() { return m_topLeftLayout; }
@@ -60,42 +64,55 @@ private:
   QVBoxLayout *m_bottomLeftLayout;
 };
 
-namespace OCT {
-
 class ImageOverlay : public OverlayWidget {
 public:
   explicit ImageOverlay(QWidget *parent)
-      : OverlayWidget(parent), m_sequence(new QLabel), m_progress(new QLabel) {
+      : OverlayWidget(parent), m_sequence(new QLabel), m_filename(new QLabel),
+        m_modality(new QLabel), m_progress(new QLabel), m_imageSize(new QLabel),
+        m_zoom(new QLabel) {
     topLeftLayout()->addWidget(m_sequence);
-    topLeftLayout()->addWidget(m_progress);
+
+    bottomLeftLayout()->addWidget(m_modality);
+    bottomLeftLayout()->addWidget(m_progress);
+    bottomLeftLayout()->addWidget(m_imageSize);
+
+    bottomRightLayout()->addWidget(m_zoom);
   }
 
   void setSequence(const QString &sequence) { m_sequence->setText(sequence); }
-  void setSize(size_t size) {
-    m_size = size;
-    setProgress(m_idx, m_size);
-  }
-  void setIdx(size_t idx) {
-    m_idx = idx;
-    setProgress(m_idx, m_size);
-  }
+  void setFilename(const QString &name) { m_filename->setText(name); }
+
+  void setModality(const QString &modality) { m_modality->setText(modality); };
   void setProgress(size_t idx, size_t size) {
     m_progress->setText(QString("%1/%2").arg(idx).arg(size));
+  }
+  void setImageSize(const QSize &size) {
+    m_imageSize->setText(
+        QString("Slice: %1 x %2").arg(size.width()).arg(size.height()));
+  }
+  void setZoom(double zoom) {
+    // NOLINTNEXTLINE(*-magic-numbers)
+    m_zoom->setText(QString("Zoom: %1%").arg(static_cast<int>(zoom * 100)));
   }
 
   void clear() {
     m_sequence->clear();
+    m_modality->clear();
     m_progress->clear();
-    m_size = 0;
-    m_idx = 0;
+    m_imageSize->clear();
+    m_zoom->clear();
   }
 
 private:
+  // Top left
   QLabel *m_sequence{};
+  QLabel *m_filename{};
 
+  // Bottom left
+  QLabel *m_modality;
   QLabel *m_progress;
-  size_t m_size{};
-  size_t m_idx{};
-};
+  QLabel *m_imageSize;
 
-} // namespace OCT
+  // Bottom right
+  QLabel *m_zoom;
+};

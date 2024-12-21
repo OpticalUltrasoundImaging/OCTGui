@@ -3,7 +3,6 @@
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "OCTRecon.hpp"
-#include "Overlay.hpp"
 #include "ReconWorker.hpp"
 #include "strOps.hpp"
 #include "timeit.hpp"
@@ -20,13 +19,13 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
+#include <qnamespace.h>
 
 namespace OCT {
 
 MainWindow::MainWindow()
     : m_menuFile(menuBar()->addMenu("&File")),
       m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
-      m_imageOverlay(new ImageOverlay(m_imageDisplay->viewport())),
       m_frameController(new FrameController),
       m_exportSettingsWidget(new ExportSettingsWidget) {
 
@@ -48,13 +47,7 @@ MainWindow::MainWindow()
   auto *centralLayout = new QStackedLayout;
   centralWidget->setLayout(centralLayout);
   centralLayout->addWidget(m_imageDisplay);
-
-  // Debug
-  {
-    m_imageOverlay->setSequence("Sequence name");
-    m_imageOverlay->setSize(100);
-    m_imageOverlay->setIdx(50);
-  }
+  m_imageDisplay->overlay()->setModality("OCT");
 
   // Dock widgets
   // ------------
@@ -155,8 +148,9 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     // Update image overlay sequence label
-    m_imageOverlay->setSequence(QString::fromStdString(m_datReader->seq));
-    m_imageOverlay->setSize(m_datReader->size());
+    m_imageDisplay->overlay()->setSequence(
+        QString::fromStdString(m_datReader->seq));
+    m_imageDisplay->overlay()->setProgress(0, m_datReader->size());
 
     // Update frame controller slider
     m_frameController->setSize(m_datReader->size());
@@ -236,10 +230,9 @@ void MainWindow::loadFrame(size_t i) {
         cv::Rect(imgRadial.cols, img.rows, img.cols, combined.rows - img.rows))
         .setTo(0);
 
-    // m_imageDisplay->imshow(matToQPixmap(img));
-    // m_imageDisplay->imshow(matToQPixmap(imgRadial));
+    // Update image display
     m_imageDisplay->imshow(matToQPixmap(combined));
-    m_imageOverlay->setIdx(i);
+    m_imageDisplay->overlay()->setProgress(i, m_datReader->size());
 
     auto elapsedTotal = timeit.get_ms();
     auto msg =

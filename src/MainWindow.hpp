@@ -6,7 +6,6 @@
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
 #include "OCTRecon.hpp"
-#include "Overlay.hpp"
 #include "RingBuffer.hpp"
 #include <QAction>
 #include <QDockwidget>
@@ -33,7 +32,6 @@ private:
   QMenu *m_menuView;
 
   ImageDisplay *m_imageDisplay;
-  ImageOverlay *m_imageOverlay;
   FrameController *m_frameController;
 
   std::unique_ptr<DatReader> m_datReader;
