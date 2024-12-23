@@ -45,7 +45,7 @@ private:
   ExportSettingsWidget *m_exportSettingsWidget;
 
   void tryLoadCalibDirectory(const QString &calibDir);
-  void tryLoadDatDirectory(const fs::path &dir);
+  void tryLoadDatDirectory(const QString &dir);
 
   void loadFrame(size_t i);
 };

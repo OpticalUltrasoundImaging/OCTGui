@@ -89,15 +89,27 @@ MainWindow::MainWindow()
   // Other actions
   // -------------
   {
-    auto *act = new QAction("Import calibration folder");
+    auto *act = new QAction("Import calibration directory");
+    m_menuFile->addAction(act);
 
     connect(act, &QAction::triggered, this, [this]() {
-      const QString filename =
-          QFileDialog::getExistingDirectory(this, "Import calibration folder");
+      const QString filename = QFileDialog::getExistingDirectory(
+          this, "Import calibration directory");
 
       this->tryLoadCalibDirectory(filename);
     });
+  }
+
+  {
+    auto *act = new QAction("Open DAT data directory");
     m_menuFile->addAction(act);
+
+    connect(act, &QAction::triggered, this, [this]() {
+      const QString filename =
+          QFileDialog::getExistingDirectory(this, "Import DAT data directory");
+
+      this->tryLoadDatDirectory(filename);
+    });
   }
 }
 
@@ -137,7 +149,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
         tryLoadCalibDirectory(qpath);
       } else {
         // Load Dat sequence directory
-        tryLoadDatDirectory(stdPath);
+        tryLoadDatDirectory(qpath);
       }
     }
   }
@@ -166,14 +178,15 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   }
 }
 
-void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
-  m_datReader = std::make_unique<DatReader>(dir);
+void MainWindow::tryLoadDatDirectory(const QString &dir) {
+  const auto dirp = toPath(dir);
+  m_datReader = std::make_unique<DatReader>(dirp);
 
   constexpr int statusTimeoutMs = 5000;
   if (m_datReader->ok()) {
 
     // Update status bar
-    const auto msg = QString("Loaded dat directory ") + toQString(dir);
+    const auto msg = QString("Loaded dat directory ") + dir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     // Update image overlay sequence label
@@ -195,7 +208,7 @@ void MainWindow::tryLoadDatDirectory(const fs::path &dir) {
     loadFrame(0);
 
   } else {
-    const auto msg = QString("Failed to load dat directory ") + toQString(dir);
+    const auto msg = QString("Failed to load dat directory ") + dir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_exportDir.clear();
