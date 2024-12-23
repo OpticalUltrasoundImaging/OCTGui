@@ -2,6 +2,7 @@
 
 #include "Overlay.hpp"
 #include <QEvent>
+#include <QGestureEvent>
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 #include <QGraphicsSceneEvent>
@@ -16,7 +17,8 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
-#include <qgraphicsview.h>
+#include <qgesture.h>
+#include <qnamespace.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -34,12 +36,16 @@ public:
 
     setAlignment(Qt::AlignCenter);
 
+    // Hide scrollbars
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    // Enable mouse tracking
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
+    setFocusPolicy(Qt::StrongFocus);
 
+    // Enable pinch gesture handling
     viewport()->setAttribute(Qt::WA_AcceptTouchEvents);
     grabGesture(Qt::PinchGesture);
 
@@ -79,17 +85,24 @@ public:
   }
 
 protected:
+  bool event(QEvent *event) override {
+    if (event->type() == QEvent::Gesture) {
+      return gestureEvent(dynamic_cast<QGestureEvent *>(event));
+    }
+    return QGraphicsView::event(event);
+  }
+
   void wheelEvent(QWheelEvent *event) override {
     constexpr auto WHEEL_ZOOM_MODIFIER = Qt::ControlModifier;
     if (event->modifiers().testFlag(WHEEL_ZOOM_MODIFIER)) {
       event->accept();
 
       // Calculate scale factor
+      // https://wiki.qt.io/Smooth_Zoom_In_QGraphicsView
       const double numDeg = event->angleDelta().y() / 8.0;
       const double numSteps = numDeg / 15.0;
       constexpr double sensitivity = 0.1;
       const double scaleFactor = 1.0 - numSteps * sensitivity;
-      const auto &evPos = event->position();
       m_scaleFactor = std::max(m_scaleFactor * scaleFactor, m_scaleFactorMin);
 
       updateTransform();
@@ -184,4 +197,19 @@ private:
     m_lastPanPoint = event->pos();
   }
   void panEndEvent(QMouseEvent *event) { setCursor(m_lastPanCursor); }
+
+  bool gestureEvent(QGestureEvent *event) {
+    if (QGesture *pinch = event->gesture(Qt::PinchGesture)) {
+      pinchTriggered(static_cast<QPinchGesture *>(pinch));
+    }
+    return true;
+  }
+
+  void pinchTriggered(QPinchGesture *gesture) {
+    if (gesture->state() == Qt::GestureState::GestureUpdated) {
+      const qreal scaleFactor = gesture->scaleFactor();
+      m_scaleFactor = std::max(scaleFactor * m_scaleFactor, m_scaleFactorMin);
+      updateTransform();
+    }
+  }
 };
