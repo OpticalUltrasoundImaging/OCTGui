@@ -12,7 +12,7 @@ env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite;nuget,https://nuget.pkg.github.com/kwsp/index.json,readwrite"
 
 jobs:
-  Build-Win64:
+  Build-x64-windows:
     runs-on: windows-2022
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -63,7 +63,7 @@ jobs:
           if-no-files-found: "warn" # output a warning if no files are found.
           overwrite: true
 
-  Build-mac:
+  Build-arm64-osx:
     runs-on: macos-latest
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -125,6 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OCTGui-arm64-osx
-          path: ${{ github.workspace }}/build/clang/src/Release/OCTGui
+          path: ${{ github.workspace }}/build/clang/src/Release/OCTGui.dmg
+          compression-level: 0
           if-no-files-found: "warn" # output a warning if no files are found.
           overwrite: true
