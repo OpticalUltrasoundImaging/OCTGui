@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <string>
@@ -26,8 +27,7 @@ inline QString toQString(const std::string &str) {
 
 // Lower all cases in-place
 inline void toLower_(std::string &str) {
-  std::transform(str.begin(), str.end(), str.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+  std::ranges::transform(str, str.begin(), [](unsigned char c) { return std::tolower(c); });
 }
 
 // Returns a copy of str with all cases lowered

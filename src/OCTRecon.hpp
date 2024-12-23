@@ -9,13 +9,14 @@
 #include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <numbers>
 #include <opencv2/core.hpp>
 #include <opencv2/core/base.hpp>
 #include <opencv2/opencv.hpp>
 #include <span>
 #include <vector>
 
-// NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers)
+// NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers, *-reinterpret-cast)
 
 namespace OCT {
 
@@ -26,8 +27,9 @@ concept Floating = std::is_same_v<T, double> || std::is_same_v<T, float>;
 
 template <Floating T> std::vector<T> getHamming(int n) {
   std::vector<T> win(n);
+  constexpr auto pi = std::numbers::pi_v<T>;
   for (int i = 0; i < n; ++i) {
-    win[i] = 0.54 - 0.46 * std::cos(2 * 3.1415926535897932384626 * i / n);
+    win[i] = 0.54 - 0.46 * std::cos(2 * pi * i / n);
   }
   return win;
 }
@@ -243,7 +245,8 @@ inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
 
   const cv::Size dsize{dim * 2, dim * 2};
   const double radius = dim;
-  const cv::Point2f center(radius, radius);
+  const auto radiusf = static_cast<float>(radius);
+  const cv::Point2f center(radiusf, radiusf);
 
   const int flags = cv::WARP_FILL_OUTLIERS + cv::WARP_INVERSE_MAP;
 
@@ -259,4 +262,4 @@ inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
 
 } // namespace OCT
 
-// NOLINTEND(*-pointer-arithmetic, *-magic-numbers)
+// NOLINTEND(*-pointer-arithmetic, *-magic-numbers, *-reinterpret-cast)

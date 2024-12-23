@@ -53,6 +53,8 @@ public:
 
     int i = 0;
 
+    // NOLINTBEGIN(*-magic-numbers)
+
     makeLabeledSpinbox(layout, i++, "Image depth", "", {}, m_params.imageDepth,
                        {500, 1000});
 
@@ -61,6 +63,8 @@ public:
 
     makeLabeledSpinbox(layout, i++, "Contrast", "", {}, m_params.contrast,
                        {0, 15});
+
+    // NOLINTEND(*-magic-numbers)
   }
 
   [[nodiscard]] auto params() const { return m_params; }
