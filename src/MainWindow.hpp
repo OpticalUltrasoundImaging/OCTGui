@@ -6,6 +6,7 @@
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
 #include "OCTRecon.hpp"
+#include "OCTReconParamsController.hpp"
 #include "RingBuffer.hpp"
 #include <QAction>
 #include <QDockwidget>
@@ -33,6 +34,7 @@ private:
 
   ImageDisplay *m_imageDisplay;
   FrameController *m_frameController;
+  OCTReconParamsController *m_reconParamsController;
 
   std::unique_ptr<DatReader> m_datReader;
   std::unique_ptr<Calibration<Float>> m_calib;

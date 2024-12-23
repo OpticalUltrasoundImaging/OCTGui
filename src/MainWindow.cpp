@@ -3,6 +3,7 @@
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "OCTRecon.hpp"
+#include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
 #include "strOps.hpp"
 #include "timeit.hpp"
@@ -15,10 +16,12 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
+#include <Qt>
 #include <algorithm>
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
+#include <qdockwidget.h>
 #include <qnamespace.h>
 
 namespace OCT {
@@ -27,6 +30,7 @@ MainWindow::MainWindow()
     : m_menuFile(menuBar()->addMenu("&File")),
       m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
       m_frameController(new FrameController),
+      m_reconParamsController(new OCTReconParamsController),
       m_exportSettingsWidget(new ExportSettingsWidget) {
 
   // Configure MainWindow
@@ -63,6 +67,17 @@ MainWindow::MainWindow()
 
     menuBar()->addMenu(m_frameController->menu());
   }
+
+  // OCTReconParamsController
+  {
+    auto *dock = new QDockWidget("OCT Recon Params");
+    this->addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+
+    dock->setWidget(m_reconParamsController);
+  }
+
+  // Export settings
   {
     auto *dock = new QDockWidget("Export settings");
     this->addDockWidget(Qt::TopDockWidgetArea, dock);
@@ -195,7 +210,8 @@ void MainWindow::loadFrame(size_t i) {
     float elapsedRecon{};
     {
       TimeIt timeitRecon;
-      img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize);
+      img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize,
+                              m_reconParamsController->params());
       elapsedRecon = timeitRecon.get_ms();
     }
 

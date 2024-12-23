@@ -39,6 +39,7 @@ qt_add_executable(${EXE_NAME}
     FrameController.hpp
     ExportSettings.hpp
     Overlay.hpp
+    OCTReconParamsController.hpp
 )
 
 set_target_properties(${EXE_NAME} PROPERTIES 

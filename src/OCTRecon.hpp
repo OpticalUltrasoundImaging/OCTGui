@@ -76,9 +76,12 @@ template <Floating T> struct Calibration {
   }
 };
 
-template <Floating T> struct ScanConversionParams {
-  T contrast;
-  T brightness;
+template <Floating T> struct OCTReconParams {
+  int imageDepth = 624;
+
+  // Conversion params
+  int contrast = 9;
+  int brightness = -57;
 };
 
 template <typename T, typename Tout = uint8_t>
@@ -136,19 +139,18 @@ template <typename T> inline void circshift(cv::Mat_<T> &mat, int idx) {
 template <Floating T>
 [[nodiscard]] cv::Mat_<uint8_t>
 reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
-           size_t ALineSize, const int imageDepth = 624,
-           ScanConversionParams<T> conversionParams = ScanConversionParams<T>{
-               .contrast = 9., .brightness = -57.}) {
+           const size_t ALineSize, const OCTReconParams<T> &params = {}) {
 
   assert((fringe.size() % ALineSize) == 0);
   const auto nLines = fringe.size() / ALineSize;
 
+  const auto win = getHamming<T>(ALineSize);
+  const auto contrast = params.contrast;
+  const auto brightness = params.brightness;
+  const int imageDepth = params.imageDepth;
+
   // cv::Mat constructor takes (height, width)
   cv::Mat_<T> mat(nLines, imageDepth);
-
-  const auto win = getHamming<T>(ALineSize);
-  const auto contrast = conversionParams.contrast;
-  const auto brightness = conversionParams.brightness;
 
   const auto &fft = fftw::EngineR2C1D<T>::get(ALineSize);
 
