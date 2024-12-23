@@ -8,6 +8,7 @@
 #include "strOps.hpp"
 #include "timeit.hpp"
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QLabel>
 #include <QMenuBar>
@@ -21,8 +22,6 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
-#include <qdockwidget.h>
-#include <qnamespace.h>
 
 namespace OCT {
 
@@ -86,6 +85,20 @@ MainWindow::MainWindow()
     dock->setWidget(m_exportSettingsWidget);
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
+
+  // Other actions
+  // -------------
+  {
+    auto *act = new QAction("Import calibration folder");
+
+    connect(act, &QAction::triggered, this, [this]() {
+      const QString filename =
+          QFileDialog::getExistingDirectory(this, "Import calibration folder");
+
+      this->tryLoadCalibDirectory(filename);
+    });
+    m_menuFile->addAction(act);
+  }
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -109,7 +122,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
   const auto *mimeData = event->mimeData();
   if (mimeData->hasUrls()) {
     const auto &urls = mimeData->urls();
-    const auto stdPath = toPath(urls[0].toLocalFile());
+    const auto qpath = urls[0].toLocalFile();
+    const auto stdPath = toPath(qpath);
 
     if (fs::is_directory(stdPath)) {
 
@@ -120,7 +134,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
         // "SSOCTBackground.txt" and "SSOCTCalibration180MHZ.txt")
 
         // Load calibration files
-        tryLoadCalibDirectory(stdPath);
+        tryLoadCalibDirectory(qpath);
       } else {
         // Load Dat sequence directory
         tryLoadDatDirectory(stdPath);
@@ -129,9 +143,10 @@ void MainWindow::dropEvent(QDropEvent *event) {
   }
 }
 
-void MainWindow::tryLoadCalibDirectory(const fs::path &calibDir) {
-  const auto backgroundFile = calibDir / "SSOCTBackground.txt";
-  const auto phaseFile = calibDir / "SSOCTCalibration180MHZ.txt";
+void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
+  const auto calibDirP = toPath(calibDir);
+  const auto backgroundFile = calibDirP / "SSOCTBackground.txt";
+  const auto phaseFile = calibDirP / "SSOCTCalibration180MHZ.txt";
 
   constexpr int statusTimeoutMs = 5000;
 
@@ -140,14 +155,13 @@ void MainWindow::tryLoadCalibDirectory(const fs::path &calibDir) {
                                                    backgroundFile, phaseFile);
 
     ;
-    const auto msg =
-        QString("Loaded calibration files from ") + toQString(calibDir);
+    const auto msg = QString("Loaded calibration files from ") + calibDir;
 
     statusBar()->showMessage(msg, statusTimeoutMs);
   } else {
     // TODO more logging
-    const auto msg = QString("Failed to load calibration files from ") +
-                     QString::fromStdString(calibDir.string());
+    const auto msg =
+        QString("Failed to load calibration files from ") + calibDir;
     statusBar()->showMessage(msg, statusTimeoutMs);
   }
 }
