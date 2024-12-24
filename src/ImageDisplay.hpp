@@ -17,8 +17,6 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
-#include <qgesture.h>
-#include <qnamespace.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -34,6 +32,7 @@ public:
       : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())) {
     setBackgroundBrush(QBrush(Qt::black));
 
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     setAlignment(Qt::AlignCenter);
 
     // Hide scrollbars
@@ -126,13 +125,17 @@ protected:
     if (event->button() == Qt::MiddleButton) {
       m_cursor.middleButton = true;
       panStartEvent(event);
+      return;
     }
+    return QGraphicsView::mousePressEvent(event);
   }
 
   void mouseMoveEvent(QMouseEvent *event) override {
     if (m_cursor.middleButton) {
       panMoveEvent(event);
+      return;
     }
+    return QGraphicsView::mouseMoveEvent(event);
   }
 
   void mouseReleaseEvent(QMouseEvent *event) override {
@@ -140,6 +143,7 @@ protected:
       m_cursor.middleButton = false;
       panEndEvent(event);
     }
+    return QGraphicsView::mouseReleaseEvent(event);
   }
 
 private:
@@ -150,7 +154,6 @@ private:
 
   double m_scaleFactor{1.0};
   double m_scaleFactorMin{1.0};
-  QTransform m_transform;
 
   CursorState m_cursor;
   QPoint m_lastPanPoint{};
@@ -159,14 +162,15 @@ private:
   bool m_resetZoomOnNext{true};
 
   void updateTransform() {
-    m_transform = QTransform();
-    m_transform.scale(m_scaleFactor, m_scaleFactor);
+    // Set the transformation anchor to under the mouse
+    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 
-    const auto anchor = transformationAnchor();
-    setTransformationAnchor(AnchorUnderMouse);
-    setTransform(m_transform);
-    setTransformationAnchor(anchor);
+    // Update the transformation matrix
+    auto transform = QTransform();
+    transform.scale(m_scaleFactor, m_scaleFactor);
+    setTransform(transform);
 
+    // Update overlay zoom level (if applicable)
     m_overlay->setZoom(m_scaleFactor);
   }
 
@@ -200,7 +204,7 @@ private:
 
   bool gestureEvent(QGestureEvent *event) {
     if (QGesture *pinch = event->gesture(Qt::PinchGesture)) {
-      pinchTriggered(static_cast<QPinchGesture *>(pinch));
+      pinchTriggered(dynamic_cast<QPinchGesture *>(pinch));
     }
     return true;
   }
