@@ -2,6 +2,7 @@
 
 #include "Overlay.hpp"
 #include <QEvent>
+#include <QGestureEvent>
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 #include <QGraphicsSceneEvent>
@@ -16,7 +17,6 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
-#include <qgraphicsview.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -32,14 +32,19 @@ public:
       : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())) {
     setBackgroundBrush(QBrush(Qt::black));
 
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     setAlignment(Qt::AlignCenter);
 
+    // Hide scrollbars
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    // Enable mouse tracking
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
+    setFocusPolicy(Qt::StrongFocus);
 
+    // Enable pinch gesture handling
     viewport()->setAttribute(Qt::WA_AcceptTouchEvents);
     grabGesture(Qt::PinchGesture);
 
@@ -79,17 +84,24 @@ public:
   }
 
 protected:
+  bool event(QEvent *event) override {
+    if (event->type() == QEvent::Gesture) {
+      return gestureEvent(dynamic_cast<QGestureEvent *>(event));
+    }
+    return QGraphicsView::event(event);
+  }
+
   void wheelEvent(QWheelEvent *event) override {
     constexpr auto WHEEL_ZOOM_MODIFIER = Qt::ControlModifier;
     if (event->modifiers().testFlag(WHEEL_ZOOM_MODIFIER)) {
       event->accept();
 
       // Calculate scale factor
+      // https://wiki.qt.io/Smooth_Zoom_In_QGraphicsView
       const double numDeg = event->angleDelta().y() / 8.0;
       const double numSteps = numDeg / 15.0;
       constexpr double sensitivity = 0.1;
       const double scaleFactor = 1.0 - numSteps * sensitivity;
-      const auto &evPos = event->position();
       m_scaleFactor = std::max(m_scaleFactor * scaleFactor, m_scaleFactorMin);
 
       updateTransform();
@@ -113,13 +125,17 @@ protected:
     if (event->button() == Qt::MiddleButton) {
       m_cursor.middleButton = true;
       panStartEvent(event);
+      return;
     }
+    return QGraphicsView::mousePressEvent(event);
   }
 
   void mouseMoveEvent(QMouseEvent *event) override {
     if (m_cursor.middleButton) {
       panMoveEvent(event);
+      return;
     }
+    return QGraphicsView::mouseMoveEvent(event);
   }
 
   void mouseReleaseEvent(QMouseEvent *event) override {
@@ -127,6 +143,7 @@ protected:
       m_cursor.middleButton = false;
       panEndEvent(event);
     }
+    return QGraphicsView::mouseReleaseEvent(event);
   }
 
 private:
@@ -137,7 +154,6 @@ private:
 
   double m_scaleFactor{1.0};
   double m_scaleFactorMin{1.0};
-  QTransform m_transform;
 
   CursorState m_cursor;
   QPoint m_lastPanPoint{};
@@ -146,14 +162,15 @@ private:
   bool m_resetZoomOnNext{true};
 
   void updateTransform() {
-    m_transform = QTransform();
-    m_transform.scale(m_scaleFactor, m_scaleFactor);
+    // Set the transformation anchor to under the mouse
+    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 
-    const auto anchor = transformationAnchor();
-    setTransformationAnchor(AnchorUnderMouse);
-    setTransform(m_transform);
-    setTransformationAnchor(anchor);
+    // Update the transformation matrix
+    auto transform = QTransform();
+    transform.scale(m_scaleFactor, m_scaleFactor);
+    setTransform(transform);
 
+    // Update overlay zoom level (if applicable)
     m_overlay->setZoom(m_scaleFactor);
   }
 
@@ -184,4 +201,19 @@ private:
     m_lastPanPoint = event->pos();
   }
   void panEndEvent(QMouseEvent *event) { setCursor(m_lastPanCursor); }
+
+  bool gestureEvent(QGestureEvent *event) {
+    if (QGesture *pinch = event->gesture(Qt::PinchGesture)) {
+      pinchTriggered(dynamic_cast<QPinchGesture *>(pinch));
+    }
+    return true;
+  }
+
+  void pinchTriggered(QPinchGesture *gesture) {
+    if (gesture->state() == Qt::GestureState::GestureUpdated) {
+      const qreal scaleFactor = gesture->scaleFactor();
+      m_scaleFactor = std::max(scaleFactor * m_scaleFactor, m_scaleFactorMin);
+      updateTransform();
+    }
+  }
 };

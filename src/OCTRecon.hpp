@@ -35,7 +35,7 @@ template <Floating T> std::vector<T> getHamming(int n) {
 }
 
 template <typename T>
-inline void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
+void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
   std::ifstream ifs(filename);
   if (ifs.is_open()) {
     T val{};
@@ -46,7 +46,7 @@ inline void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
     }
 
     if (ifs.eof()) {
-      std::cout << "Reached end of file " << filename << '\n';
+      // std::cout << "Reached end of file " << filename << '\n';
     } else if (ifs.fail()) {
       std::cerr << "Failed to read value in file " << filename << '\n';
     } else if (ifs.bad()) {
