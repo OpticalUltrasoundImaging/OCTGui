@@ -88,7 +88,6 @@ if (WIN32)
 
 elseif (APPLE)
 
-
     # Post-build steps for macOS
     # https://doc.qt.io/qt-6/macos-deployment.html
 

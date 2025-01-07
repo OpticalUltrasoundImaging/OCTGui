@@ -1,9 +1,9 @@
 #pragma once
 
-#include "fftw.hpp"
 #include "phasecorr.hpp"
 #include "timeit.hpp"
 #include <cassert>
+#include <fftconv/fftw.hpp>
 #include <fftw3.h>
 #include <filesystem>
 #include <fmt/format.h>
