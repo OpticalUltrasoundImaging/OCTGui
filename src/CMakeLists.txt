@@ -30,6 +30,9 @@ endif()
 add_definitions(-DQCUSTOMPLOT_USE_LIBRARY)
 
 
+### Icons
+set(app_icon_windows "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/OCTGui.rc")
+
 qt_add_executable(${EXE_NAME}
     main.cpp
     MainWindow.hpp
@@ -41,6 +44,7 @@ qt_add_executable(${EXE_NAME}
     ExportSettings.hpp
     Overlay.hpp
     OCTReconParamsController.hpp
+    ${app_icon_windows}
 )
 
 set_target_properties(${EXE_NAME} PROPERTIES 
@@ -67,7 +71,6 @@ target_link_libraries(${EXE_NAME} PRIVATE
 )
 
 # TODO: configure DAQ
-
 
 ### Run Qt deploy script
 if (WIN32)
