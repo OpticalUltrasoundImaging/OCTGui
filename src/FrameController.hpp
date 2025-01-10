@@ -43,7 +43,7 @@ public:
     connect(m_slider, &QSlider::sliderReleased, this, [&] {
       const auto pos = m_slider->value();
       QToolTip::showText(QCursor::pos(), QString::number(pos));
-      emit posChanged(pos);
+      Q_EMIT posChanged(pos);
     });
 
     // Actions and menu
@@ -66,7 +66,8 @@ public:
   [[nodiscard]] size_t size() const { return m_slider->maximum(); }
   [[nodiscard]] size_t pos() const { return m_slider->value(); }
 
-public slots:
+public Q_SLOTS:
+
   void nextNoEmit() {
     const auto i = pos();
     if (i < size() - 1) {
@@ -81,14 +82,14 @@ public slots:
   }
   void next() {
     nextNoEmit();
-    emit posChanged(pos());
+    Q_EMIT posChanged(pos());
   }
   void prev() {
     prevNoEmit();
-    emit posChanged(pos());
+    Q_EMIT posChanged(pos());
   }
 
-signals:
+Q_SIGNALS:
   void posChanged(size_t pos);
 
 private:

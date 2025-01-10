@@ -29,7 +29,7 @@ public:
                        size_t ALineSize)
       : ringBuffer(std::move(buffer)), ALineSize(ALineSize) {}
 
-public slots:
+public Q_SLOTS:
   void setCalibration(std::shared_ptr<Calibration<Float>> calibration) {
     this->calibration = std::move(calibration);
   }
@@ -43,12 +43,12 @@ public slots:
     while (!shouldStop) {
       ringBuffer->consume([this](const std::span<const uint16_t> fringe) {
         auto mat = reconBscan(*calibration, fringe, ALineSize);
-        emit completeOne(matToQPixmap(mat));
+        Q_EMIT completeOne(matToQPixmap(mat));
       });
     }
   }
 
-signals:
+Q_SIGNALS:
   void completeOne(const QPixmap &pixmap);
 
 private:

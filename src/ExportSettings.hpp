@@ -56,7 +56,7 @@ public:
   QMenu *menu() { return m_menu; }
   const auto &settings() { return m_settings; }
 
-signals:
+Q_SIGNALS:
   void updated(ExportSettings m_settings);
 
 private:

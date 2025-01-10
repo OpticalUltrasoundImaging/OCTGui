@@ -4,6 +4,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
+find_package(TBB CONFIG REQUIRED)
 find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Gui)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
@@ -47,6 +48,8 @@ set_target_properties(${EXE_NAME} PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
+target_compile_definitions(${EXE_NAME} PRIVATE -DQT_NO_KEYWORDS)
+
 target_include_directories(${EXE_NAME} PRIVATE
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -59,6 +62,8 @@ target_link_libraries(${EXE_NAME} PRIVATE
     opencv_world
     FFTW3::fftw3
     FFTW3::fftw3f
+    TBB::tbb
+    TBB::tbbmalloc
 )
 
 # TODO: configure DAQ

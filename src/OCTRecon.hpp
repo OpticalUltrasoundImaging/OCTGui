@@ -3,6 +3,7 @@
 #include "phasecorr.hpp"
 #include "timeit.hpp"
 #include <cassert>
+#include <fftconv/aligned_vector.hpp>
 #include <fftconv/fftw.hpp>
 #include <fftw3.h>
 #include <filesystem>
@@ -10,11 +11,14 @@
 #include <fstream>
 #include <iostream>
 #include <numbers>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/scalable_allocator.h>
 #include <opencv2/core.hpp>
 #include <opencv2/core/base.hpp>
 #include <opencv2/opencv.hpp>
 #include <span>
-#include <vector>
+#include <tbb/parallel_for.h>
+#include <tbb/scalable_allocator.h>
 
 // NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers, *-reinterpret-cast)
 
@@ -25,8 +29,8 @@ namespace fs = std::filesystem;
 template <typename T>
 concept Floating = std::is_same_v<T, double> || std::is_same_v<T, float>;
 
-template <Floating T> std::vector<T> getHamming(int n) {
-  std::vector<T> win(n);
+template <Floating T> auto getHamming(int n) {
+  fftconv::AlignedVector<T> win(n);
   constexpr auto pi = std::numbers::pi_v<T>;
   for (int i = 0; i < n; ++i) {
     win[i] = 0.54 - 0.46 * std::cos(2 * pi * i / n);
@@ -67,8 +71,8 @@ template <Floating T> struct phaseCalibUnit {
 };
 
 template <Floating T> struct Calibration {
-  std::vector<T> background;
-  std::vector<phaseCalibUnit<T>> phaseCalib;
+  fftconv::AlignedVector<T> background;
+  fftconv::AlignedVector<phaseCalibUnit<T>> phaseCalib;
 
   Calibration(int n_samples, const fs::path &backgroundFile,
               const fs::path &phaseFile)
@@ -86,17 +90,15 @@ template <Floating T> struct OCTReconParams {
   int brightness = -57;
 };
 
-template <typename T, typename Tout = uint8_t>
+template <typename T, typename Tout = T>
 void logCompress(Tout *outptr, size_t imageDepth, fftw::Complex<T> *cx,
                  T contrast, T brightness) {
   for (size_t i = 0; i < imageDepth; ++i) {
     const auto ro = cx[i][0];
     const auto io = cx[i][1];
-
     T val = ro * ro + io * io;
     val = contrast * (10 * log10(val) + brightness);
-    val = val < 0 ? 0 : val > 255 ? 255 : val;
-    outptr[i] = static_cast<Tout>(val);
+    outptr[i] = std::clamp<T>(val, 0, 255);
   }
 }
 
@@ -156,13 +158,13 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
 
   const auto &fft = fftw::EngineR2C1D<T>::get(ALineSize);
 
-  const cv::Range range(0, nLines);
-  cv::parallel_for_(range, [&](cv::Range range) {
+  tbb::blocked_range<size_t> range(0, nLines);
+  tbb::parallel_for(range, [&](const tbb::blocked_range<size_t> &range) {
     fftw::R2CBuffer<T> fftBuf(ALineSize);
-    std::vector<T> alineBuf(ALineSize);
-    std::vector<T> linearKFringe(ALineSize);
+    std::vector<T, tbb::scalable_allocator<T>> alineBuf(ALineSize);
+    std::vector<T, tbb::scalable_allocator<T>> linearKFringe(ALineSize);
 
-    for (int j = range.start; j < range.end; ++j) {
+    for (size_t j = range.begin(); j < range.end(); ++j) {
       const auto offset = j * ALineSize;
 
       // 1. Subtract background
