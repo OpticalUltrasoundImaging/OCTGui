@@ -56,7 +56,7 @@ public:
     // NOLINTBEGIN(*-magic-numbers)
 
     makeLabeledSpinbox(layout, i++, "Image depth", "", {}, m_params.imageDepth,
-                       {500, 1000});
+                       {200, 1000});
 
     makeLabeledSpinbox(layout, i++, "Brightness", "", {}, m_params.brightness,
                        {-70, 0});
