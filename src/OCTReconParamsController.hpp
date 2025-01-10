@@ -64,16 +64,28 @@ public:
     makeLabeledSpinbox(layout, i++, "Contrast", "", {}, m_params.contrast,
                        {0, 15});
 
+    auto [label, offsetSpinbox] =
+        makeLabeledSpinbox(layout, i++, "Offset", "", {},
+                           m_params.additionalOffset, {-1000, 1000});
+    m_offsetSpinbox = offsetSpinbox; // NOLINT(*initializer)
+
     // NOLINTEND(*-magic-numbers)
   }
 
   [[nodiscard]] auto params() const { return m_params; }
+
+  void clearOffset() {
+    m_params.additionalOffset = 0;
+    m_offsetSpinbox->setValue(0);
+  }
 
 private:
   OCTReconParams<Float> m_params{};
   std::vector<std::function<void()>> updateGuiFromParamsCallbacks;
 
   void updateGuiFromParams();
+
+  QSpinBox *m_offsetSpinbox{};
 };
 
 } // namespace OCT

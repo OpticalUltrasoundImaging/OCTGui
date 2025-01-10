@@ -88,6 +88,8 @@ template <Floating T> struct OCTReconParams {
   // Conversion params
   int contrast = 9;
   int brightness = -57;
+
+  int additionalOffset = 0;
 };
 
 template <typename T, typename Tout = T>
@@ -224,7 +226,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
     static cv::Mat_<T> prevMat;
     if (prevMat.cols == mat.cols && prevMat.rows == mat.rows) {
       int alignOffset = std::round(cvMod::phaseCorrelate(prevMat, mat).x);
-      circshift(mat, alignOffset);
+      circshift(mat, alignOffset + params.additionalOffset);
     }
     mat.copyTo(prevMat);
 

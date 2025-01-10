@@ -19,6 +19,7 @@
 #include <QVBoxLayout>
 #include <Qt>
 #include <algorithm>
+#include <fftconv/aligned_vector.hpp>
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
@@ -218,16 +219,15 @@ void MainWindow::tryLoadDatDirectory(const QString &dir) {
 
 void MainWindow::loadFrame(size_t i) {
   if (m_calib != nullptr) {
-    // Recon 1 frame
-    i = std::clamp<size_t>(i, 0, m_datReader->size());
-
     TimeIt timeit;
 
-    std::vector<uint16_t> fringe(m_datReader->samplesPerFrame());
-    auto err = m_datReader->read(i, 1, fringe);
-    if (err) {
-      auto msg = fmt::format("While loading {}/{}, got {}", i,
-                             m_datReader->size(), *err);
+    // Recon 1 frame
+    i = std::clamp<size_t>(i, 0, m_datReader->size());
+    fftconv::AlignedVector<uint16_t> fringe(m_datReader->samplesPerFrame());
+
+    if (auto err = m_datReader->read(i, 1, fringe); err) {
+      const auto msg = fmt::format("While loading {}/{}, got {}", i,
+                                   m_datReader->size(), *err);
       statusBar()->showMessage(QString::fromStdString(msg));
       return;
     }
@@ -240,6 +240,10 @@ void MainWindow::loadFrame(size_t i) {
       img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize,
                               m_reconParamsController->params());
       elapsedRecon = timeitRecon.get_ms();
+    }
+
+    if (m_reconParamsController->params().additionalOffset != 0) {
+      m_reconParamsController->clearOffset();
     }
 
     cv::Mat_<uint8_t> imgRadial;
