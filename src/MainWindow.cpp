@@ -73,6 +73,9 @@ MainWindow::MainWindow()
     auto *dock = new QDockWidget("OCT Recon Params");
     this->addDockWidget(Qt::TopDockWidgetArea, dock);
     m_menuView->addAction(dock->toggleViewAction());
+    dock->toggleViewAction()->setShortcut({Qt::CTRL | Qt::SHIFT | Qt::Key_P});
+
+    dock->toggleViewAction();
 
     dock->setWidget(m_reconParamsController);
   }
@@ -84,6 +87,7 @@ MainWindow::MainWindow()
     m_menuView->addAction(dock->toggleViewAction());
 
     dock->setWidget(m_exportSettingsWidget);
+    dock->hide();
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
 
@@ -104,6 +108,7 @@ MainWindow::MainWindow()
   {
     auto *act = new QAction("Open DAT data directory");
     m_menuFile->addAction(act);
+    act->setShortcut({Qt::CTRL | Qt::Key_O});
 
     connect(act, &QAction::triggered, this, [this]() {
       const QString filename =

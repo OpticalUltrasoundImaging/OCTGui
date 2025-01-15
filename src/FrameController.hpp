@@ -18,7 +18,7 @@ class FrameController : public QWidget {
   Q_OBJECT
 public:
   FrameController()
-      : m_slider(new QSlider), m_menu(new QMenu("Frame")),
+      : m_slider(new QSlider), m_menu(new QMenu("F&rame")),
         m_actNext(new QAction("Next frame")),
         m_actPrev(new QAction("Prev frame")) {
     m_slider->setMinimum(0);

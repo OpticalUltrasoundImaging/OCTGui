@@ -17,7 +17,7 @@ struct ExportSettings {
 class ExportSettingsWidget : public QWidget {
 
 public:
-  ExportSettingsWidget() : m_menu(new QMenu("Export")) {
+  ExportSettingsWidget() : m_menu(new QMenu("&Export")) {
     // UI
     // --
     auto *layout = new QGridLayout;
@@ -49,8 +49,18 @@ public:
       m_menu->addActions(checkbox->actions());
     };
 
-    makeLabeledCheckbox(layout, 0, "Save images", "Should images be exported",
-                        m_settings.saveImages);
+    // makeLabeledCheckbox(layout, 0, "Save images", "Should images be
+    // exported",
+    //                     m_settings.saveImages);
+
+    {
+      auto *act = new QAction("Save images");
+      act->setCheckable(true);
+      act->setChecked(m_settings.saveImages);
+      m_menu->addAction(act);
+      connect(act, &QAction::changed,
+              [this, act]() { m_settings.saveImages = act->isChecked(); });
+    }
   }
 
   QMenu *menu() { return m_menu; }
