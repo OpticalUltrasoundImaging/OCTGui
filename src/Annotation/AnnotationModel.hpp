@@ -1,0 +1,120 @@
+#pragma once
+
+#include "Annotation.hpp"
+#include "AnnotationModelColumnMeta.hpp"
+#include <QAbstractListModel>
+#include <QColor>
+#include <QColorDialog>
+#include <QLineF>
+#include <QList>
+#include <QMimeData>
+#include <QModelIndexList>
+#include <QPolygonF>
+#include <QRectF>
+#include <QString>
+#include <QStringList>
+#include <QVariant>
+#include <Qt>
+#include <array>
+
+namespace annotation {
+
+/**
+AnnotationModel represents the list of annotations for one frame
+ */
+class AnnotationModel : public QAbstractListModel {
+  Q_OBJECT
+public:
+  enum AnnotationRoles { TypeRole = Qt::UserRole + 1, NameRole, ColorRole };
+
+  [[nodiscard]] bool dirty() const { return m_dirty; }
+  void setDirty(bool state = true) { m_dirty = state; }
+
+  [[nodiscard]] auto &annotations() const { return m_annotations; }
+  void setAnnotations(QList<Annotation> annotations);
+
+  using ColMeta = ColumnMetaData;
+
+  // Column metadata
+  inline static const std::array HEADER_DATA{
+      ColMeta{"Type", false,
+              [](const Annotation &anno) {
+                return Annotation::typeToString(anno.type);
+              }},
+      ColMeta{"Name", true, [](const Annotation &anno) { return anno.name; },
+              [](Annotation &anno, const QVariant &val) {
+                anno.name = val.toString();
+              }},
+      ColMeta{"Color", false,
+              [](const Annotation &anno) { return anno.color; }}};
+
+  [[nodiscard]] int rowCount(const QModelIndex &parent) const override;
+  [[nodiscard]] int columnCount(const QModelIndex &parent) const override;
+
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
+                                    int role) const override;
+
+  [[nodiscard]] QVariant data(const QModelIndex &index,
+                              int role) const override;
+
+  bool setData(const QModelIndex &index, const QVariant &value,
+               int role) override;
+
+  [[nodiscard]] Qt::ItemFlags flags(const QModelIndex &index) const override;
+
+  bool removeRows(int row, int count, const QModelIndex &parent) override;
+
+  void addAnnotation(const Annotation &annotation);
+
+  // It's equivalent to call removeRow(int)
+  // void removeAnnotation(int row);
+
+  [[nodiscard]] auto &front() { return m_annotations.front(); }
+  [[nodiscard]] const auto &front() const { return m_annotations.front(); }
+  [[nodiscard]] auto &back() { return m_annotations.back(); }
+  [[nodiscard]] const auto &back() const { return m_annotations.back(); }
+
+  [[nodiscard]] Annotation const &getAnnotation(int row) const {
+    return m_annotations[row];
+  }
+
+  [[nodiscard]] Annotation &at(int row) { return m_annotations[row]; }
+  [[nodiscard]] const Annotation &at(int row) const {
+    return m_annotations[row];
+  }
+
+  [[nodiscard]] auto size() { return m_annotations.size(); }
+
+  void clear();
+
+  // Enable copy and paste
+  [[nodiscard]] Qt::DropActions supportedDropActions() const override {
+    return Qt::CopyAction | Qt::MoveAction;
+  }
+
+  // Copy
+  [[nodiscard]] QStringList mimeType() const;
+  [[nodiscard]] QMimeData *
+  mimeData(const QModelIndexList &indexes) const override;
+
+  // Paste
+  bool canDropMimeData(const QMimeData *data, Qt::DropAction action, int row,
+                       int column, const QModelIndex &parent) const override;
+  bool dropMimeData(const QMimeData *data, Qt::DropAction action, int row,
+                    int column, const QModelIndex &parent) override;
+
+private:
+  QList<Annotation> m_annotations;
+  bool m_dirty{false};
+};
+
+#undef ANNO_GETTER
+#undef ANNO_SETTER
+
+using json = nlohmann::json;
+
+void to_json(json &j, const AnnotationModel &model);
+
+void from_json(const json &j, AnnotationModel &model);
+
+} // namespace annotation
