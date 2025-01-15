@@ -89,6 +89,10 @@ template <Floating T> struct OCTReconParams {
   int contrast = 9;
   int brightness = -57;
 
+  // Padding (top) for radial images
+  int padTop = 300;
+
+  // Change the rotation of the image
   int additionalOffset = 0;
 };
 
@@ -239,7 +243,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
 }
 
 inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
-                            int padTop = 625) {
+                            int padTop = 0) {
 
   const int dim = std::min(in.rows, in.cols);
 

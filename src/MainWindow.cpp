@@ -221,7 +221,7 @@ void MainWindow::loadFrame(size_t i) {
   if (m_calib != nullptr) {
     TimeIt timeit;
 
-    // Recon 1 frame
+    // Read the current fringe data
     i = std::clamp<size_t>(i, 0, m_datReader->size());
     fftconv::AlignedVector<uint16_t> fringe(m_datReader->samplesPerFrame());
 
@@ -232,17 +232,18 @@ void MainWindow::loadFrame(size_t i) {
       return;
     }
 
+    // Recon
+    const auto params = m_reconParamsController->params();
     cv::Mat_<uint8_t> img;
 
     float elapsedRecon{};
     {
       TimeIt timeitRecon;
-      img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize,
-                              m_reconParamsController->params());
+      img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize, params);
       elapsedRecon = timeitRecon.get_ms();
     }
 
-    if (m_reconParamsController->params().additionalOffset != 0) {
+    if (params.additionalOffset != 0) {
       m_reconParamsController->clearOffset();
     }
 
@@ -250,7 +251,7 @@ void MainWindow::loadFrame(size_t i) {
     float elapsedRadial{};
     {
       TimeIt timeit;
-      makeRadialImage(img, imgRadial);
+      makeRadialImage(img, imgRadial, params.padTop);
       elapsedRadial = timeit.get_ms();
     }
 

@@ -69,6 +69,9 @@ public:
                            m_params.additionalOffset, {-1000, 1000});
     m_offsetSpinbox = offsetSpinbox; // NOLINT(*initializer)
 
+    makeLabeledSpinbox(layout, i++, "Pad top", "", "px", m_params.padTop,
+                       {0, 625});
+
     // NOLINTEND(*-magic-numbers)
   }
 
