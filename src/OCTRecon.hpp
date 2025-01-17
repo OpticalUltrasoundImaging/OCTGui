@@ -85,6 +85,9 @@ template <Floating T> struct Calibration {
 template <Floating T> struct OCTReconParams {
   int imageDepth = 624;
 
+  // Split spectrum OCT FFT
+  int n_splits = 1;
+
   // Conversion params
   int contrast = 9;
   int brightness = -57;
@@ -99,12 +102,26 @@ template <Floating T> struct OCTReconParams {
 template <typename T, typename Tout = T>
 void logCompress(Tout *outptr, size_t imageDepth, fftw::Complex<T> *cx,
                  T contrast, T brightness) {
+  T fct = 1.0 / 6144;
   for (size_t i = 0; i < imageDepth; ++i) {
-    const auto ro = cx[i][0];
-    const auto io = cx[i][1];
+    const T ro = cx[i][0];
+    const T io = cx[i][1];
     T val = ro * ro + io * io;
     val = contrast * (10 * log10(val) + brightness);
     outptr[i] = std::clamp<T>(val, 0, 255);
+  }
+}
+
+template <typename T, typename Tout = T>
+void logCompress_add(Tout *outptr, size_t imageDepth, fftw::Complex<T> *cx,
+                     T contrast, T brightness) {
+  T fct = 1.0 / 6144;
+  for (size_t i = 0; i < imageDepth; ++i) {
+    const T ro = cx[i][0];
+    const T io = cx[i][1];
+    T val = ro * ro + io * io;
+    val = contrast * (10 * log10(val) + brightness);
+    outptr[i] += std::clamp<T>(val, 0, 255);
   }
 }
 
@@ -146,6 +163,9 @@ template <typename T> inline void circshift(cv::Mat_<T> &mat, int idx) {
   }
 }
 
+/**
+Original impl. without split spectrum
+ */
 template <Floating T>
 [[nodiscard]] cv::Mat_<uint8_t>
 reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
@@ -198,6 +218,118 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
       // 4. Copy result into image
       T *outptr = reinterpret_cast<T *>(mat.ptr(j));
       logCompress<T>(outptr, imageDepth, fftBuf.out, contrast, brightness);
+    }
+  });
+
+  mat = mat.t();
+
+  // Distortion correction and resize to theoretical aline number
+  {
+    TimeIt timeit;
+
+    size_t theoreticalALines = nLines;
+    if (nLines == 2500) {
+      // theoreticalALines = 2234;
+      // Don't need distortion correction for the ex vivo probe.
+    } else if (nLines == 2200) {
+      theoreticalALines = 2000;
+
+      const cv::Size targetSize(theoreticalALines, mat.rows);
+      const int distOffset = getDistortionOffset(mat, theoreticalALines,
+                                                 nLines - theoreticalALines);
+      cv::resize(mat(cv::Rect(0, 0, theoreticalALines + distOffset, mat.rows)),
+                 mat, targetSize);
+    }
+
+    // fmt::println("Distortion correction elapsed: {} ms", timeit.get_ms());
+  }
+
+  // Align Bscans
+  {
+    TimeIt timeit;
+    static cv::Mat_<T> prevMat;
+    if (prevMat.cols == mat.cols && prevMat.rows == mat.rows) {
+      int alignOffset = std::round(cvMod::phaseCorrelate(prevMat, mat).x);
+      circshift(mat, alignOffset + params.additionalOffset);
+    }
+    mat.copyTo(prevMat);
+
+    // fmt::println("Align correction elapsed: {} ms", timeit.get_ms());
+  }
+
+  cv::Mat_<uint8_t> outmat;
+  mat.convertTo(outmat, CV_8U);
+  return mat;
+}
+
+/**
+Split the `n` point sampled spectral fringe to `n_splits`, using size `n /
+n_splits` FFTs instead of size `n` FFTs, and average the result
+ */
+template <Floating T>
+[[nodiscard]] cv::Mat_<uint8_t> reconBscan_splitSpectrum(
+    const Calibration<T> &calib, const std::span<const uint16_t> fringe,
+    const size_t ALineSize, const OCTReconParams<T> &params = {}) {
+
+  assert((fringe.size() % ALineSize) == 0);
+  const auto nLines = fringe.size() / ALineSize;
+
+  const int n_splits = params.n_splits;
+  const int splitSize = ALineSize / n_splits;
+
+  const auto win = getHamming<T>(splitSize);
+  const auto contrast = params.contrast;
+  const auto brightness = params.brightness;
+  const int imageDepth = params.imageDepth;
+
+  // cv::Mat constructor takes (height, width)
+  // std::vector<cv::Mat_<T>> mats(n_splits);
+  // for (int i_split = 0; i_split < n_splits; ++i_split) {
+  //   mats[i_split] = cv::Mat_<T>(nLines, imageDepth);
+  // }
+  cv::Mat_<T> mat = cv::Mat_<T>::zeros(nLines, imageDepth);
+
+  const auto &fft = fftw::EngineR2C1D<T>::get(splitSize);
+
+  tbb::blocked_range<size_t> range(0, nLines);
+  tbb::parallel_for(range, [&](const tbb::blocked_range<size_t> &range) {
+    fftw::R2CBuffer<T> fftBuf(ALineSize);
+    std::vector<T, tbb::scalable_allocator<T>> alineBuf(ALineSize);
+    std::vector<T, tbb::scalable_allocator<T>> linearKFringe(ALineSize);
+
+    for (size_t j = range.begin(); j < range.end(); ++j) {
+      const auto offset = j * ALineSize;
+
+      // 1. Subtract background
+      for (int i = 0; i < ALineSize; ++i) {
+        alineBuf[i] = fringe[offset + i] - calib.background[i];
+      }
+
+      // 2. Interpolate phase calibration data
+      for (int i = 0; i < ALineSize - 1; ++i) {
+        const auto idx = calib.phaseCalib[i].idx;
+        const auto unit = calib.phaseCalib[idx];
+        const auto l_coeff = unit.l_coeff;
+        const auto r_coeff = unit.r_coeff;
+        linearKFringe[i] =
+            alineBuf[idx] * l_coeff + alineBuf[idx + 1] * r_coeff;
+      }
+
+      for (int i_split = 0; i_split < n_splits; ++i_split) {
+        // 3. Windowed FFT over splits
+        const int offset = i_split * splitSize;
+        for (int i = 0; i < splitSize; ++i) {
+          fftBuf.in[i] = win[i] * linearKFringe[offset + i];
+        }
+        fft.forward(fftBuf.in, fftBuf.out);
+
+        // 4. Copy result into image
+        // T *outptr = reinterpret_cast<T *>(mats[i_split].ptr(j));
+        // logCompress<T>(outptr, imageDepth, fftBuf.out, contrast, brightness);
+        T *outptr = reinterpret_cast<T *>(mat.ptr(j));
+        logCompress_add<T>(outptr, imageDepth, fftBuf.out, contrast,
+                           brightness);
+      }
     }
   });
 

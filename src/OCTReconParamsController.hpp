@@ -54,6 +54,8 @@ public:
     int i = 0;
 
     // NOLINTBEGIN(*-magic-numbers)
+    makeLabeledSpinbox(layout, i++, "Split spectrum", "", {}, m_params.n_splits,
+                       {1, 5});
 
     makeLabeledSpinbox(layout, i++, "Image depth", "", {}, m_params.imageDepth,
                        {200, 1000});
