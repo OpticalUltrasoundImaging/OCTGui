@@ -398,6 +398,8 @@ inline void makeRadialImage(const cv::Mat_<uint8_t> &in, cv::Mat_<uint8_t> &out,
     cv::warpPolar(in.t(), out, dsize, center, radius,
                   flags); // linear Polar, 3
   }
+
+  cv::flip(out, out, 1);
 }
 
 } // namespace OCT
