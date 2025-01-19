@@ -52,6 +52,23 @@ qt_add_executable(${EXE_NAME}
     ExportSettings.hpp
     Overlay.hpp
     OCTReconParamsController.hpp
+
+    Annotation/Annotation.cpp
+    Annotation/Annotation.hpp
+    Annotation/AnnotationJsonFile.cpp
+    Annotation/AnnotationJsonFile.hpp
+    Annotation/AnnotationModel.cpp
+    Annotation/AnnotationModel.hpp
+    Annotation/AnnotationModelColumnMeta.hpp
+    Annotation/AnnotationView.cpp
+    Annotation/AnnotationView.hpp
+    Annotation/GeometryUtils.cpp
+    Annotation/GeometryUtils.hpp
+    Annotation/GraphicsItemBase.cpp
+    Annotation/GraphicsItemBase.hpp
+    Annotation/GraphicsItems.cpp
+    Annotation/GraphicsItems.hpp
+
     ${app_icon_macos}
     ${app_icon_windows}
 )
@@ -64,6 +81,7 @@ set_target_properties(${EXE_NAME} PROPERTIES
 target_compile_definitions(${EXE_NAME} PRIVATE -DQT_NO_KEYWORDS)
 
 target_include_directories(${EXE_NAME} PRIVATE
+  .
   ${OpenCV_INCLUDE_DIRS}
 )
 

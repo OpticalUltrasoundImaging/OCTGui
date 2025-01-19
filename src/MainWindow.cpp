@@ -52,6 +52,7 @@ MainWindow::MainWindow()
   centralWidget->setLayout(centralLayout);
   centralLayout->addWidget(m_imageDisplay);
   m_imageDisplay->overlay()->setModality("OCT");
+  m_imageDisplay->setEnabled(false);
 
   // Dock widgets
   // ------------
@@ -212,6 +213,8 @@ void MainWindow::tryLoadDatDirectory(const QString &dir) {
 
     // Load the first frame
     loadFrame(0);
+
+    m_imageDisplay->setEnabled(true);
 
   } else {
     const auto msg = QString("Failed to load dat directory ") + dir;

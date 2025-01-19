@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Annotation/Annotation.hpp"
+#include "Annotation/GeometryUtils.hpp"
+#include "Annotation/GraphicsItems.hpp"
 #include "Overlay.hpp"
 #include <QEvent>
 #include <QGestureEvent>
@@ -17,6 +20,7 @@
 #include <QTransform>
 #include <QWheelEvent>
 #include <Qt>
+#include <qnamespace.h>
 
 class ImageDisplay : public QGraphicsView {
   Q_OBJECT;
@@ -26,7 +30,26 @@ public:
     bool leftButton{};
     bool middleButton{};
     bool rightButton{};
+
+    // Position in pixmap coord
+    QPointF pos, startPos;
+
+    [[nodiscard]] auto line() const { return QLineF(startPos, pos); }
+    [[nodiscard]] auto rect() const {
+      qreal x = qMin(pos.x(), startPos.x());
+      qreal y = qMin(pos.y(), startPos.y());
+
+      qreal w = qAbs(pos.x() - startPos.x());
+      qreal h = qAbs(pos.y() - startPos.y());
+      return QRectF(x, y, w, h);
+    }
   };
+
+  enum class CursorMode {
+    Default = 0, // Delegate to QGraphicsView
+    MeasureLine,
+  };
+  Q_ENUM(CursorMode)
 
   ImageDisplay()
       : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())) {
@@ -122,7 +145,34 @@ protected:
   }
 
   void mousePressEvent(QMouseEvent *event) override {
-    if (event->button() == Qt::MiddleButton) {
+    m_cursor.startPos = m_PixmapItem->mapFromScene(mapToScene(event->pos()));
+    m_cursor.pos = m_cursor.startPos;
+
+    if (event->button() == Qt::LeftButton) {
+      m_cursor.leftButton = true;
+      switch (m_cursorMode) {
+      case CursorMode::Default:
+        break;
+      case CursorMode::MeasureLine:
+        event->accept();
+
+        const auto line = m_cursor.line();
+        const auto color = Qt::white;
+
+        if (m_currItem != nullptr) {
+          m_Scene->removeItem(m_currItem);
+          delete m_currItem;
+        }
+
+        m_currItem =
+            new annotation::LineItem(annotation::Annotation(line, color));
+        m_currItem->updateScaleFactor(m_scaleFactor);
+        m_Scene->addItem(m_currItem);
+
+        break;
+      }
+
+    } else if (event->button() == Qt::MiddleButton) {
       m_cursor.middleButton = true;
       panStartEvent(event);
       return;
@@ -131,15 +181,59 @@ protected:
   }
 
   void mouseMoveEvent(QMouseEvent *event) override {
-    if (m_cursor.middleButton) {
+    m_cursor.pos = m_PixmapItem->mapFromScene(mapToScene(event->pos()));
+
+    if (m_cursor.leftButton) {
+      switch (m_cursorMode) {
+      case CursorMode::Default:
+        break;
+      case CursorMode::MeasureLine: {
+        event->accept();
+
+        if (auto *item = dynamic_cast<annotation::LineItem *>(m_currItem);
+            item != nullptr) {
+          const auto line = m_cursor.line();
+          const auto distance = geometry::calcMagnitude(line.p1() - line.p2());
+
+          item->setLine(line);
+          item->setText(QString("%1 px").arg(distance, 5, 'd', 0));
+        }
+
+      } break;
+      }
+
+    } else if (m_cursor.middleButton) {
       panMoveEvent(event);
       return;
     }
+
     return QGraphicsView::mouseMoveEvent(event);
   }
 
   void mouseReleaseEvent(QMouseEvent *event) override {
-    if (m_cursor.middleButton) {
+    if (event->button() == Qt::LeftButton) {
+      m_cursor.leftButton = false;
+
+      switch (m_cursorMode) {
+      case CursorMode::Default:
+        break;
+      case CursorMode::MeasureLine: {
+        const auto line = m_cursor.line();
+
+        // Save annotation
+        if (m_currItem != nullptr) {
+          // const auto anno = m_currItem->annotation();
+
+          // Delete currItem
+          m_Scene->removeItem(m_currItem);
+          delete m_currItem;
+          m_currItem = nullptr;
+        }
+
+      } break;
+      }
+
+    } else if (event->button() == Qt::MiddleButton) {
       m_cursor.middleButton = false;
       panEndEvent(event);
     }
@@ -154,12 +248,14 @@ private:
 
   double m_scaleFactor{1.0};
   double m_scaleFactorMin{1.0};
+  bool m_resetZoomOnNext{true};
 
   CursorState m_cursor;
-  QPoint m_lastPanPoint{};
-  QCursor m_lastPanCursor{};
+  CursorMode m_cursorMode{CursorMode::MeasureLine};
+  QPoint m_lastPanPoint;
+  QCursor m_lastPanCursor;
 
-  bool m_resetZoomOnNext{true};
+  annotation::GraphicsItemBase *m_currItem{};
 
   void updateTransform() {
     // Set the transformation anchor to under the mouse
