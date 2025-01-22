@@ -70,7 +70,7 @@ public Q_SLOTS:
 
   void nextNoEmit() {
     const auto i = pos();
-    if (i < size() - 1) {
+    if (i < size()) {
       setPos(i + 1);
     }
   }
