@@ -93,6 +93,8 @@ MainWindow::MainWindow()
 
   // Other actions
   // -------------
+  m_menuView->addAction(m_imageDisplay->actResetZoom());
+
   {
     auto *act = new QAction("Import calibration directory");
     m_menuFile->addAction(act);

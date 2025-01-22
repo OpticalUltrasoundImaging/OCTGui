@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Overlay.hpp"
+#include <QAction>
 #include <QEvent>
 #include <QGestureEvent>
 #include <QGraphicsItem>
@@ -29,7 +30,8 @@ public:
   };
 
   ImageDisplay()
-      : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())) {
+      : m_Scene(new QGraphicsScene), m_overlay(new ImageOverlay(viewport())),
+        m_actResetZoom(new QAction("Reset Zoom")) {
     setBackgroundBrush(QBrush(Qt::black));
 
     setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
@@ -50,6 +52,10 @@ public:
 
     setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     setScene(m_Scene);
+
+    m_actResetZoom->setShortcut({Qt::CTRL | Qt::Key_R});
+    connect(m_actResetZoom, &QAction::triggered, this,
+            &ImageDisplay::resetZoomOnNext);
 
     m_overlay->hide();
   }
@@ -76,6 +82,7 @@ public:
   void imshow(const QImage &img) { imshow(QPixmap::fromImage(img)); }
 
   void resetZoomOnNext() { m_resetZoomOnNext = true; }
+  [[nodiscard]] auto actResetZoom() const { return m_actResetZoom; }
 
   void scaleToSize() {
     updateMinScaleFactor();
@@ -154,6 +161,7 @@ private:
 
   double m_scaleFactor{1.0};
   double m_scaleFactorMin{1.0};
+  QAction *m_actResetZoom;
 
   CursorState m_cursor;
   QPoint m_lastPanPoint{};
