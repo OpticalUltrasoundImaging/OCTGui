@@ -26,6 +26,10 @@ namespace fs = std::filesystem;
   return name;
 }
 
+[[nodiscard]] inline std::string getSequenceName(const fs::path &path) {
+  return (path.parent_path().stem() / path.stem()).string();
+}
+
 /**
 Read a sequence of old .dat files
 
@@ -47,7 +51,7 @@ struct DatReader {
   explicit DatReader(const fs::path &directory) {
     try {
       if (fs::exists(directory) && fs::is_directory(directory)) {
-        seq = getDirectoryName(directory);
+        seq = getSequenceName(directory);
 
         for (const auto &entry : fs::directory_iterator(directory)) {
           if (entry.is_regular_file() && entry.path().extension() == ".dat") {
