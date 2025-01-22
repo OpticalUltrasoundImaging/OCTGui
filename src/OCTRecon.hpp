@@ -99,6 +99,9 @@ template <Floating T> struct OCTReconParams {
   // Padding (top) for radial images
   int padTop = 300;
 
+  // Clear pixels at the top of the rect image (DC offset)
+  int clearTop = 50;
+
   // Change the rotation of the image
   int additionalOffset = 0;
 };
@@ -122,11 +125,11 @@ void logCompress(const std::span<Tout> out,
 template <typename T, typename Tout = T>
 void logCompress_add(const std::span<Tout> out,
                      const std::span<const fftw::Complex<T>> inCx, T contrast,
-                     T brightness) {
+                     T brightness, size_t offsetTop = 0) {
   assert(out.size() <= inCx.size());
   const T fct = 1.0 / inCx.size();
   const T fct2 = 20 * log10(fct); // 20 because fct is not squared
-  for (size_t i = 0; i < out.size(); ++i) {
+  for (size_t i = offsetTop; i < out.size(); ++i) {
     const T ro = inCx[i][0];
     const T io = inCx[i][1];
     T val = ro * ro + io * io;
@@ -338,7 +341,7 @@ template <Floating T>
         // 4. Copy result into image
         T *outptr = reinterpret_cast<T *>(mat.ptr(j));
         logCompress_add<T>({outptr, imageDepth}, {fftBuf.out, splitSize},
-                           contrast, brightness);
+                           contrast, brightness, params.clearTop);
       }
     }
   });

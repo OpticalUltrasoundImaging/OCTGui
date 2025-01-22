@@ -110,6 +110,10 @@ public:
                        "Padding top (pixels) before polar transform.", "px",
                        m_params.padTop, {0, 625});
 
+    makeLabeledSpinbox(layout, i++, "Clear top",
+                       "Clear this many pixels at the top of the rect image",
+                       "px", m_params.clearTop, {0, 200});
+
     auto [label, offsetSpinbox] = makeLabeledSpinbox(
         layout, i++, "Manual offset",
         "Manually change the rotation offset to rotate the image once", {},
