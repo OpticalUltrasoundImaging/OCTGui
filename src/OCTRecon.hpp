@@ -100,7 +100,7 @@ template <Floating T> struct OCTReconParams {
   int padTop = 300;
 
   // Clear pixels at the top of the rect image (DC offset)
-  int clearTop = 50;
+  int clearTop = 20;
 
   // Change the rotation of the image
   int additionalOffset = 0;
