@@ -171,13 +171,14 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
     m_calib = std::make_unique<Calibration<Float>>(DatReader::ALineSize,
                                                    backgroundFile, phaseFile);
-
-    ;
     const auto msg = QString("Loaded calibration files from ") + calibDir;
 
     statusBar()->showMessage(msg, statusTimeoutMs);
+
+    if (m_datReader != nullptr) {
+      loadFrame(m_frameController->pos());
+    }
   } else {
-    // TODO more logging
     const auto msg =
         QString("Failed to load calibration files from ") + calibDir;
     statusBar()->showMessage(msg, statusTimeoutMs);
@@ -223,7 +224,7 @@ void MainWindow::tryLoadDatDirectory(const QString &dir) {
 }
 
 void MainWindow::loadFrame(size_t i) {
-  if (m_calib != nullptr) {
+  if (m_calib != nullptr && m_datReader != nullptr) {
     TimeIt timeit;
 
     // Read the current fringe data
