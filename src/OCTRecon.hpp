@@ -140,13 +140,25 @@ void logCompress_add(const std::span<Tout> out,
 }
 
 inline int getDistortionOffset(const cv::Mat &mat, int theoryWidth,
-                               int corrWidth) {
+                               int NumAlines) {
+  constexpr int additionalCorrWidth = 0;
+  const int corrWidth = NumAlines - theoryWidth + additionalCorrWidth;
   auto firstStrip = mat(cv::Rect(0, 0, corrWidth, mat.rows));
-  auto lastStrip = mat(cv::Rect(theoryWidth, 0, corrWidth, mat.rows));
+  auto lastStrip =
+      mat(cv::Rect(theoryWidth - additionalCorrWidth, 0, corrWidth, mat.rows));
   firstStrip.convertTo(firstStrip, CV_32F);
   lastStrip.convertTo(lastStrip, CV_32F);
-  return static_cast<int>(
-      std::round(cvMod::phaseCorrelate(firstStrip, lastStrip).x));
+
+  // {
+  //   cv::Mat firstStripDebug, lastStripDebug;
+  //   firstStrip.convertTo(firstStripDebug, CV_8U);
+  //   lastStrip.convertTo(lastStripDebug, CV_8U);
+  //   cv::imshow("firstStrip", firstStripDebug);
+  //   cv::imshow("lastStrip", lastStripDebug);
+  // }
+
+  return static_cast<int>(std::round(
+      cvMod::phaseCorrelate(firstStrip, lastStrip).x - additionalCorrWidth));
 }
 
 inline void shiftXCircular(const cv::Mat &src, cv::Mat &dst, int shiftX) {
@@ -250,8 +262,8 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
       theoreticalALines = 2000;
 
       const cv::Size targetSize(theoreticalALines, mat.rows);
-      const int distOffset = getDistortionOffset(mat, theoreticalALines,
-                                                 nLines - theoreticalALines);
+      const int distOffset =
+          getDistortionOffset(mat, theoreticalALines, nLines);
       cv::resize(mat(cv::Rect(0, 0, theoreticalALines + distOffset, mat.rows)),
                  mat, targetSize);
     }
@@ -360,8 +372,8 @@ template <Floating T>
       theoreticalALines = 2000;
 
       const cv::Size targetSize(theoreticalALines, mat.rows);
-      const int distOffset = getDistortionOffset(mat, theoreticalALines,
-                                                 nLines - theoreticalALines);
+      const int distOffset =
+          getDistortionOffset(mat, theoreticalALines, nLines);
       cv::resize(mat(cv::Rect(0, 0, theoreticalALines + distOffset, mat.rows)),
                  mat, targetSize);
     }
