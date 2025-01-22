@@ -56,6 +56,10 @@ public:
     {
       auto &value = m_params.n_splits;
 
+      auto *label = new QLabel("Splits");
+      label->setToolTip("No. of splits for split-spectrum OCT");
+      layout->addWidget(label, i, 0);
+
       auto *spinBox = new QSpinBox;
       spinBox->setRange(1, 5);
       spinBox->setValue(static_cast<int>(value));
@@ -87,8 +91,8 @@ public:
       });
     }
 
-    makeLabeledSpinbox(layout, i++, "Image depth", "", {}, m_params.imageDepth,
-                       {100, 1000});
+    makeLabeledSpinbox(layout, i++, "Image depth", "Height of rect image", {},
+                       m_params.imageDepth, {100, 1000});
 
     makeLabeledSpinbox(layout, i++, "Brightness", "", {}, m_params.brightness,
                        {-70, 0});
@@ -99,9 +103,10 @@ public:
     makeLabeledSpinbox(layout, i++, "Pad top", "", "px", m_params.padTop,
                        {0, 625});
 
-    auto [label, offsetSpinbox] =
-        makeLabeledSpinbox(layout, i++, "Offset", "", {},
-                           m_params.additionalOffset, {-1000, 1000});
+    auto [label, offsetSpinbox] = makeLabeledSpinbox(
+        layout, i++, "Manual offset",
+        "Manually change the rotation offset to rotate the image once", {},
+        m_params.additionalOffset, {-1000, 1000});
     m_offsetSpinbox = offsetSpinbox; // NOLINT(*initializer)
     // NOLINTEND(*-magic-numbers)
   }
