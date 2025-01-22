@@ -94,14 +94,21 @@ public:
     makeLabeledSpinbox(layout, i++, "Image depth", "Height of rect image", {},
                        m_params.imageDepth, {100, 1000});
 
-    makeLabeledSpinbox(layout, i++, "Brightness", "", {}, m_params.brightness,
-                       {-70, 0});
+    makeLabeledSpinbox(
+        layout, i++, "Brightness",
+        "20 * log10(X) + Brightness. "
+        "In the old software, the result of the 6144-point FFT is not "
+        "normalized, and the default brightness was -60. "
+        "With correction, dividing the FFT by 6144, the old default brightness "
+        "value is approximately 17.",
+        {}, m_params.brightness, {0, 50});
 
-    makeLabeledSpinbox(layout, i++, "Contrast", "", {}, m_params.contrast,
-                       {0, 15});
+    makeLabeledSpinbox(layout, i++, "Contrast", "Multiplier after 20*log10(X).",
+                       {}, m_params.contrast, {0, 15});
 
-    makeLabeledSpinbox(layout, i++, "Pad top", "", "px", m_params.padTop,
-                       {0, 625});
+    makeLabeledSpinbox(layout, i++, "Pad top",
+                       "Padding top (pixels) before polar transform.", "px",
+                       m_params.padTop, {0, 625});
 
     auto [label, offsetSpinbox] = makeLabeledSpinbox(
         layout, i++, "Manual offset",

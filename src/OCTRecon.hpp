@@ -90,7 +90,11 @@ template <Floating T> struct OCTReconParams {
 
   // Conversion params
   int contrast = 9;
-  int brightness = -57;
+  // In the old software, the result of the 6144-point FFT is not normalized,
+  // and the default log shift factor (brightness) was -60. With correction,
+  // dividing the FFT by 6144, the old default brightness value is approximately
+  // 17.
+  int brightness = 18;
 
   // Padding (top) for radial images
   int padTop = 300;
@@ -100,28 +104,35 @@ template <Floating T> struct OCTReconParams {
 };
 
 template <typename T, typename Tout = T>
-void logCompress(Tout *outptr, size_t imageDepth, fftw::Complex<T> *cx,
-                 T contrast, T brightness) {
-  T fct = 1.0 / 6144;
-  for (size_t i = 0; i < imageDepth; ++i) {
+void logCompress(const std::span<Tout> out,
+                 const std::span<const fftw::Complex<T>> cx, T contrast,
+                 T brightness) {
+  const T fct = 1.0 / cx.size();
+  const T fct2 = 20 * log10(fct); // 20 because fct is not squared
+  for (size_t i = 0; i < out.size(); ++i) {
     const T ro = cx[i][0];
     const T io = cx[i][1];
     T val = ro * ro + io * io;
-    val = contrast * (10 * log10(val) + brightness);
-    outptr[i] = std::clamp<T>(val, 0, 255);
+    // Note the 10 * log10 is because val is the square
+    val = contrast * (10 * log10(val) + brightness + fct2);
+    out[i] = std::clamp<T>(val, 0, 255);
   }
 }
 
 template <typename T, typename Tout = T>
-void logCompress_add(Tout *outptr, size_t imageDepth, fftw::Complex<T> *cx,
-                     T contrast, T brightness) {
-  T fct = 1.0 / 6144;
-  for (size_t i = 0; i < imageDepth; ++i) {
-    const T ro = cx[i][0];
-    const T io = cx[i][1];
+void logCompress_add(const std::span<Tout> out,
+                     const std::span<const fftw::Complex<T>> inCx, T contrast,
+                     T brightness) {
+  assert(out.size() <= inCx.size());
+  const T fct = 1.0 / inCx.size();
+  const T fct2 = 20 * log10(fct); // 20 because fct is not squared
+  for (size_t i = 0; i < out.size(); ++i) {
+    const T ro = inCx[i][0];
+    const T io = inCx[i][1];
     T val = ro * ro + io * io;
-    val = contrast * (10 * log10(val) + brightness);
-    outptr[i] += std::clamp<T>(val, 0, 255);
+    // Note the 10 * log10 is because val is squared
+    val = contrast * (10 * log10(val) + brightness + fct2);
+    out[i] += std::clamp<T>(val, 0, 255);
   }
 }
 
@@ -177,7 +188,7 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
   const auto win = getHamming<T>(ALineSize);
   const auto contrast = params.contrast;
   const auto brightness = params.brightness;
-  const int imageDepth = params.imageDepth;
+  const size_t imageDepth = params.imageDepth;
 
   // cv::Mat constructor takes (height, width)
   cv::Mat_<T> mat(nLines, imageDepth);
@@ -217,7 +228,8 @@ reconBscan(const Calibration<T> &calib, const std::span<const uint16_t> fringe,
 
       // 4. Copy result into image
       T *outptr = reinterpret_cast<T *>(mat.ptr(j));
-      logCompress<T>(outptr, imageDepth, fftBuf.out, contrast, brightness);
+      logCompress<T>({outptr, imageDepth}, {fftBuf.out, ALineSize}, contrast,
+                     brightness);
     }
   });
 
@@ -274,13 +286,13 @@ template <Floating T>
   assert((fringe.size() % ALineSize) == 0);
   const auto nLines = fringe.size() / ALineSize;
 
-  const int n_splits = params.n_splits;
-  const int splitSize = ALineSize / n_splits;
+  const size_t n_splits = params.n_splits;
+  const size_t splitSize = ALineSize / n_splits;
 
   const auto win = getHamming<T>(splitSize);
   const auto contrast = params.contrast;
   const auto brightness = params.brightness;
-  const int imageDepth = params.imageDepth;
+  const size_t imageDepth = params.imageDepth;
 
   // cv::Mat constructor takes (height, width)
   // std::vector<cv::Mat_<T>> mats(n_splits);
@@ -324,11 +336,9 @@ template <Floating T>
         fft.forward(fftBuf.in, fftBuf.out);
 
         // 4. Copy result into image
-        // T *outptr = reinterpret_cast<T *>(mats[i_split].ptr(j));
-        // logCompress<T>(outptr, imageDepth, fftBuf.out, contrast, brightness);
         T *outptr = reinterpret_cast<T *>(mat.ptr(j));
-        logCompress_add<T>(outptr, imageDepth, fftBuf.out, contrast,
-                           brightness);
+        logCompress_add<T>({outptr, imageDepth}, {fftBuf.out, splitSize},
+                           contrast, brightness);
       }
     }
   });

@@ -244,6 +244,8 @@ void MainWindow::loadFrame(size_t i) {
     float elapsedRecon{};
     {
       TimeIt timeitRecon;
+      // img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize,
+      // params);
       img = reconBscan_splitSpectrum<Float>(*m_calib, fringe,
                                             m_datReader->ALineSize, params);
       elapsedRecon = timeitRecon.get_ms();
