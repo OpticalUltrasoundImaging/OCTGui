@@ -29,15 +29,6 @@ namespace fs = std::filesystem;
 template <typename T>
 concept Floating = std::is_same_v<T, double> || std::is_same_v<T, float>;
 
-template <Floating T> auto getHamming(int n) {
-  fftconv::AlignedVector<T> win(n);
-  constexpr auto pi = std::numbers::pi_v<T>;
-  for (int i = 0; i < n; ++i) {
-    win[i] = 0.54 - 0.46 * std::cos(2 * pi * i / n);
-  }
-  return win;
-}
-
 template <typename T>
 void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
   std::ifstream ifs(filename);
@@ -104,6 +95,15 @@ template <Floating T> struct OCTReconParams {
 
   // Change the rotation of the image
   int additionalOffset = 0;
+};
+
+template <Floating T> struct OCTData {
+  fftconv::AlignedVector<uint16_t> fringe;
+  size_t i{};
+
+  cv::Mat_<uint8_t> imgRect;
+  cv::Mat_<uint8_t> imgRadial;
+  cv::Mat_<uint8_t> imgCombined;
 };
 
 template <typename T, typename Tout = T>
@@ -187,6 +187,15 @@ template <typename T> inline void circshift(cv::Mat_<T> &mat, int idx) {
     auto *ptr = mat.template ptr<T>(j);
     std::rotate(ptr, ptr + idx, ptr + cols);
   }
+}
+
+template <Floating T> auto getHamming(int n) {
+  fftconv::AlignedVector<T> win(n);
+  constexpr auto pi = std::numbers::pi_v<T>;
+  for (int i = 0; i < n; ++i) {
+    win[i] = 0.54 - 0.46 * std::cos(2 * pi * i / n);
+  }
+  return win;
 }
 
 /**

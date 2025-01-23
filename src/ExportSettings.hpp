@@ -5,13 +5,16 @@
 #include <QLabel>
 #include <QMenu>
 #include <QWidget>
+#include <filesystem>
 #include <functional>
 #include <vector>
 
 namespace OCT {
+namespace fs = std::filesystem;
 
 struct ExportSettings {
   bool saveImages{false};
+  fs::path exportDir;
 };
 
 class ExportSettingsWidget : public QWidget {
@@ -37,6 +40,7 @@ public:
       connect(checkbox, &QCheckBox::checkStateChanged, this,
               [this, &value](CheckState state) {
                 value = state == CheckState::Checked;
+                this->m_dirty = true;
               });
 
       updateGuiFromParamsCallbacks.emplace_back([this, checkbox, &value] {
@@ -58,13 +62,20 @@ public:
       act->setCheckable(true);
       act->setChecked(m_settings.saveImages);
       m_menu->addAction(act);
-      connect(act, &QAction::changed,
-              [this, act]() { m_settings.saveImages = act->isChecked(); });
+      connect(act, &QAction::changed, [this, act]() {
+        this->m_dirty = true;
+        m_settings.saveImages = act->isChecked();
+      });
     }
+  }
+
+  void setExportDir(const fs::path &exportDir) {
+    m_settings.exportDir = exportDir;
   }
 
   QMenu *menu() { return m_menu; }
   const auto &settings() { return m_settings; }
+  [[nodiscard]] auto dirty() const { return m_dirty; }
 
 Q_SIGNALS:
   void updated(ExportSettings m_settings);
@@ -73,6 +84,7 @@ private:
   ExportSettings m_settings;
   std::vector<std::function<void()>> updateGuiFromParamsCallbacks;
   QMenu *m_menu;
+  bool m_dirty{false};
 
   void updateGuiFromParams();
   inline void paramsUpdatedInternal() {}

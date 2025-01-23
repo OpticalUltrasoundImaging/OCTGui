@@ -1,26 +1,37 @@
 #pragma once
 
+#include <QDebug>
 #include <array>
 #include <condition_variable>
+#include <fftconv/aligned_vector.hpp>
 #include <mutex>
-#include <optional>
-#include <vector>
 
-template <typename T, size_t Size = 6> class RingBuffer {
+template <typename T, size_t Size = 3> class RingBuffer {
 public:
-  explicit RingBuffer(size_t size) : buffer(size) {}
+  using ValueType = std::shared_ptr<T>;
 
-  // Add an element to the buffer
-  bool push(const T &item) {
+  RingBuffer() {
+    for (auto &val : buffer) {
+      val = std::make_shared<T>();
+    }
+  };
+
+  template <typename Func> void forEach(const Func &func) {
+    for (auto &val : buffer) {
+      func(val);
+    }
+  }
+
+  void quit() {
     std::unique_lock<std::mutex> lock(mutex);
     if (full) {
       tail = (tail + 1) % buffer.size();
     }
-    buffer[head] = item;
+    qDebug() << "Quit at tail " << tail;
+    buffer[head] = nullptr;
     head = (head + 1) % buffer.size();
     full = head == tail;
     notEmpty.notify_one();
-    return true;
   }
 
   // Add an element to the buffer. The `produceFunc` should take `T&` and write
@@ -30,23 +41,12 @@ public:
     if (full) {
       tail = (tail + 1) % buffer.size();
     }
+    qDebug() << "Produce at tail " << tail;
     produceFunc(buffer[head]);
     head = (head + 1) % buffer.size();
     full = head == tail;
     notEmpty.notify_one();
     return true;
-  }
-
-  std::optional<T &> pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    notEmpty.wait(lock, [this]() { return !empty(); });
-    if (empty()) {
-      return std::nullopt;
-    }
-    T &item = buffer[tail];
-    tail = (tail + 1) % buffer.size();
-    full = false;
-    return item;
   }
 
   // `consumeFunc` should take `const T&` and read the value
@@ -56,6 +56,7 @@ public:
     if (empty()) {
       return;
     }
+    qDebug() << "Consume at tail " << tail;
     consumeFunc(buffer[tail]);
     tail = (tail + 1) % buffer.size();
     full = false;
@@ -75,7 +76,7 @@ public:
   }
 
 private:
-  std::array<T, Size> buffer;
+  std::array<ValueType, Size> buffer;
   size_t head{0};
   size_t tail{0};
   bool full{false};
@@ -83,5 +84,3 @@ private:
   mutable std::mutex mutex;
   std::condition_variable notEmpty;
 };
-
-template <typename T> using RingBufferOfVec = RingBuffer<std::vector<T>>;

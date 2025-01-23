@@ -79,12 +79,16 @@ public:
     bottomRightLayout()->addWidget(m_zoom);
   }
 
+public Q_SLOTS:
   void setSequence(const QString &sequence) { m_sequence->setText(sequence); }
   void setFilename(const QString &name) { m_filename->setText(name); }
 
   void setModality(const QString &modality) { m_modality->setText(modality); };
-  void setProgress(size_t idx, size_t size) {
-    m_progress->setText(QString("%1/%2").arg(idx).arg(size));
+  void setProgress(int idx, int size = -1) {
+    if (size >= 0) {
+      m_size = size;
+    }
+    m_progress->setText(QString("%1/%2").arg(idx).arg(m_size));
   }
   void setImageSize(const QSize &size) {
     m_imageSize->setText(
@@ -111,6 +115,7 @@ private:
   // Bottom left
   QLabel *m_modality;
   QLabel *m_progress;
+  int m_size{};
   QLabel *m_imageSize;
 
   // Bottom right

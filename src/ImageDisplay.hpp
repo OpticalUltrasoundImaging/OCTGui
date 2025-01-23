@@ -60,7 +60,9 @@ public:
     m_overlay->hide();
   }
 
-  [[nodiscard]] auto overlay() { return m_overlay; }
+  [[nodiscard]] auto overlay() -> ImageOverlay * { return m_overlay; }
+
+public Q_SLOTS:
 
   void imshow(const QPixmap &pixmap) {
     m_Pixmap = pixmap;
@@ -79,10 +81,9 @@ public:
     m_overlay->setImageSize(pixmap.size());
     m_overlay->show();
   }
-  void imshow(const QImage &img) { imshow(QPixmap::fromImage(img)); }
 
   void resetZoomOnNext() { m_resetZoomOnNext = true; }
-  [[nodiscard]] auto actResetZoom() const { return m_actResetZoom; }
+  [[nodiscard]] QAction *actResetZoom() { return m_actResetZoom; }
 
   void scaleToSize() {
     updateMinScaleFactor();
