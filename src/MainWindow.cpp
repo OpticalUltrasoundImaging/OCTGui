@@ -2,6 +2,7 @@
 #include "ExportSettings.hpp"
 #include "FileIO.hpp"
 #include "FrameController.hpp"
+#include "ImageDisplay.hpp"
 #include "OCTRecon.hpp"
 #include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
@@ -31,6 +32,11 @@ MainWindow::MainWindow()
       m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
       m_frameController(new FrameController),
       m_reconParamsController(new OCTReconParamsController),
+
+      m_ringBuffer(std::make_shared<RingBuffer<OCTData<Float>>>()),
+      m_worker(
+          new ReconWorker(m_ringBuffer, DatReader::ALineSize, m_imageDisplay)),
+
       m_exportSettingsWidget(new ExportSettingsWidget) {
 
   // Configure MainWindow
@@ -119,6 +125,17 @@ MainWindow::MainWindow()
       this->tryLoadDatDirectory(filename);
     });
   }
+
+  // Recon worker thread
+  {
+    m_worker->moveToThread(&m_workerThread);
+    connect(&m_workerThread, &QThread::finished, m_worker,
+            &ReconWorker::deleteLater);
+    connect(m_worker, &ReconWorker::statusMessage, this,
+            &MainWindow::statusBarMessage);
+    m_workerThread.start();
+    QMetaObject::invokeMethod(m_worker, &ReconWorker::start);
+  }
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -171,11 +188,12 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   constexpr int statusTimeoutMs = 5000;
 
   if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
-    m_calib = std::make_unique<Calibration<Float>>(DatReader::ALineSize,
+    m_calib = std::make_shared<Calibration<Float>>(DatReader::ALineSize,
                                                    backgroundFile, phaseFile);
     const auto msg = QString("Loaded calibration files from ") + calibDir;
-
     statusBar()->showMessage(msg, statusTimeoutMs);
+
+    m_worker->setCalibration(m_calib);
 
     if (m_datReader != nullptr) {
       loadFrame(m_frameController->pos());
@@ -201,17 +219,25 @@ void MainWindow::tryLoadDatDirectory(const QString &dir) {
     // Update image overlay sequence label
     m_imageDisplay->overlay()->setSequence(
         QString::fromStdString(m_datReader->seq));
-    m_imageDisplay->overlay()->setProgress(0, m_datReader->size());
+    m_imageDisplay->overlay()->setProgress(
+        0, static_cast<int>(m_datReader->size()));
 
     // Update frame controller slider
     m_frameController->setSize(m_datReader->size());
     m_frameController->setPos(0);
 
     // Set export directory
-    m_exportDir = toPath(QStandardPaths::writableLocation(
-                      QStandardPaths::DesktopLocation)) /
-                  m_datReader->seq;
-    fs::create_directories(m_exportDir);
+    const auto exportDir = toPath(QStandardPaths::writableLocation(
+                               QStandardPaths::DesktopLocation)) /
+                           m_datReader->seq;
+    m_exportSettingsWidget->setExportDir(exportDir);
+    fs::create_directories(exportDir);
+
+    // Ensure the ring buffers have enough storage
+    const auto fringeSize = m_datReader->samplesPerFrame();
+    m_ringBuffer->forEach([fringeSize](std::shared_ptr<OCTData<Float>> &dat) {
+      dat->fringe.resize(fringeSize);
+    });
 
     // Load the first frame
     loadFrame(0);
@@ -220,7 +246,7 @@ void MainWindow::tryLoadDatDirectory(const QString &dir) {
     const auto msg = QString("Failed to load dat directory ") + dir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
-    m_exportDir.clear();
+    m_exportSettingsWidget->setExportDir({});
     m_datReader = nullptr;
   }
 }
@@ -229,80 +255,43 @@ void MainWindow::loadFrame(size_t i) {
   if (m_calib != nullptr && m_datReader != nullptr) {
     TimeIt timeit;
 
-    // Read the current fringe data
-    i = std::clamp<size_t>(i, 0, m_datReader->size());
-    fftconv::AlignedVector<uint16_t> fringe(m_datReader->samplesPerFrame());
-
-    if (auto err = m_datReader->read(i, 1, fringe); err) {
-      const auto msg = fmt::format("While loading {}/{}, got {}", i,
-                                   m_datReader->size(), *err);
-      statusBar()->showMessage(QString::fromStdString(msg));
-      return;
-    }
-
     // Recon
     const auto params = m_reconParamsController->params();
-    cv::Mat_<uint8_t> img;
-
-    float elapsedRecon{};
-    {
-      TimeIt timeitRecon;
-      // img = reconBscan<Float>(*m_calib, fringe, m_datReader->ALineSize,
-      // params);
-      img = reconBscan_splitSpectrum<Float>(*m_calib, fringe,
-                                            m_datReader->ALineSize, params);
-      elapsedRecon = timeitRecon.get_ms();
-    }
-
     if (params.additionalOffset != 0) {
       m_reconParamsController->clearOffset();
     }
+    m_worker->setParams(params);
 
-    cv::Mat_<uint8_t> imgRadial;
-    float elapsedRadial{};
-    {
-      TimeIt timeit;
-      makeRadialImage(img, imgRadial, params.padTop);
-      elapsedRadial = timeit.get_ms();
+    if (m_exportSettingsWidget->dirty()) {
+      m_worker->setExportSettings(m_exportSettingsWidget->settings());
     }
 
-    const auto &settings = m_exportSettingsWidget->settings();
-    if (settings.saveImages) {
-      {
-        auto outpath = m_exportDir / fmt::format("rect-{:03}.tiff", i);
-        cv::imwrite(outpath.string(), img);
+    // Read the current fringe data
+    i = std::clamp<size_t>(i, 0, m_datReader->size());
+
+    m_ringBuffer->produce([&, this](std::shared_ptr<OCTData<Float>> &dat) {
+      dat->i = i;
+      if (auto err = m_datReader->read(i, 1, dat->fringe); err) {
+        const auto msg = fmt::format("While loading {}/{}, got {}", i,
+                                     m_datReader->size(), *err);
+        QMetaObject::invokeMethod(this, &MainWindow::statusBarMessage,
+                                  QString::fromStdString(msg));
+        return;
       }
-      {
-        auto outpath = m_exportDir / fmt::format("radial-{:03}.tiff", i);
-        cv::imwrite(outpath.string(), imgRadial);
-      }
-    }
+    });
 
-    cv::Mat_<uint8_t> combined(imgRadial.rows, imgRadial.cols + img.cols);
-    // Copy radial to left side
-    imgRadial.copyTo(combined(cv::Rect(0, 0, imgRadial.cols, imgRadial.rows)));
-    // Copy rect to top right
-    img.copyTo(combined(cv::Rect(imgRadial.cols, 0, img.cols, img.rows)));
-
-    // Clear bottom right
-    combined(
-        cv::Rect(imgRadial.cols, img.rows, img.cols, combined.rows - img.rows))
-        .setTo(0);
-
-    // Update image display
-    m_imageDisplay->imshow(matToQPixmap(combined));
-    m_imageDisplay->overlay()->setProgress(i, m_datReader->size());
-
-    auto elapsedTotal = timeit.get_ms();
-    auto msg =
-        fmt::format("Loaded frame {}/{}, recon {:.3f} ms, total {:.3f} ms", i,
-                    m_datReader->size(), elapsedRecon, elapsedTotal);
-    statusBar()->showMessage(QString::fromStdString(msg));
   } else {
-    statusBar()->showMessage(
+    statusBarMessage(
         "Please load calibration files first by dropping a directory "
         "containing the background and phase files into the GUI.");
   }
+}
+
+MainWindow::~MainWindow() {
+  m_ringBuffer->quit();
+  m_worker->setShouldStop(true);
+  m_workerThread.quit();
+  m_workerThread.wait();
 }
 
 } // namespace OCT

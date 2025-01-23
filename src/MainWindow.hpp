@@ -7,6 +7,7 @@
 #include "ImageDisplay.hpp"
 #include "OCTRecon.hpp"
 #include "OCTReconParamsController.hpp"
+#include "ReconWorker.hpp"
 #include "RingBuffer.hpp"
 #include <QAction>
 #include <QDockwidget>
@@ -14,15 +15,21 @@
 #include <QEvent>
 #include <QMainWindow>
 #include <QMenu>
-#include <filesystem>
+#include <QStatusBar>
+#include <QThread>
 #include <memory>
 
 namespace OCT {
 
+// NOLINTNEXTLINE(*-member-functions)
 class MainWindow : public QMainWindow {
   Q_OBJECT
 public:
   MainWindow();
+  ~MainWindow() override;
+
+public Q_SLOTS:
+  void statusBarMessage(const QString &msg) { statusBar()->showMessage(msg); }
 
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
@@ -37,11 +44,13 @@ private:
   OCTReconParamsController *m_reconParamsController;
 
   std::unique_ptr<DatReader> m_datReader;
-  std::unique_ptr<Calibration<Float>> m_calib;
-  std::unique_ptr<RingBufferOfVec<uint16_t>>
-      m_ringBuffer; // ring buffer for reading fringes
+  std::shared_ptr<Calibration<Float>> m_calib;
 
-  fs::path m_exportDir;
+  // ring buffer for reading fringes
+  std::shared_ptr<RingBuffer<OCTData<Float>>> m_ringBuffer;
+  ReconWorker *m_worker;
+  QThread m_workerThread;
+
   ExportSettingsWidget *m_exportSettingsWidget;
 
   void tryLoadCalibDirectory(const QString &calibDir);
