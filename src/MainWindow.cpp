@@ -126,6 +126,7 @@ MainWindow::MainWindow()
     });
   }
 
+  // Recon worker thread
   {
     m_worker->moveToThread(&m_workerThread);
     connect(&m_workerThread, &QThread::finished, m_worker,
