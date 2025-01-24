@@ -56,6 +56,10 @@ qt_add_executable(${EXE_NAME}
     ${app_icon_windows}
 )
 
+target_sources(${EXE_NAME} PRIVATE
+    DAQ.cpp
+)
+
 set_target_properties(${EXE_NAME} PROPERTIES 
     CXX_STANDARD 20
     CXX_EXTENSIONS OFF

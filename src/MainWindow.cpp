@@ -1,4 +1,5 @@
 #include "MainWindow.hpp"
+#include "DAQ.hpp"
 #include "ExportSettings.hpp"
 #include "FileIO.hpp"
 #include "FrameController.hpp"
@@ -13,6 +14,7 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QStackedLayout>
 #include <QStandardPaths>
@@ -135,6 +137,18 @@ MainWindow::MainWindow()
             &MainWindow::statusBarMessage);
     m_workerThread.start();
     QMetaObject::invokeMethod(m_worker, &ReconWorker::start);
+  }
+
+  // DAQ Info
+  {
+#ifdef OCTGUI_HAS_ALAZAR
+    auto *actDaqInfo = new QAction("DAQ Info");
+    connect(actDaqInfo, &QAction::triggered, [this]() {
+      const auto daqInfo = daq::getDAQInfo();
+      QMessageBox::about(this, "DAQ Info", QString::fromStdString(daqInfo));
+    });
+    m_menuFile->addAction(actDaqInfo);
+#endif
   }
 }
 
