@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "ExportSettings.hpp"
 #include "ImageDisplay.hpp"
+#include "OCTData.hpp"
 #include "OCTRecon.hpp"
 #include "RingBuffer.hpp"
 #include <QImage>
@@ -13,6 +14,7 @@
 #include <qobjectdefs.h>
 #include <qpixmap.h>
 #include <utility>
+
 
 namespace OCT {
 
