@@ -1,4 +1,6 @@
 #include "AcquisitionController.hpp"
+#include <QMessageBox>
+#include <qmessagebox.h>
 
 namespace OCT {
 
@@ -7,8 +9,30 @@ AcquisitionControllerObj::AcquisitionControllerObj(
     : m_daq(buffer) {}
 
 void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
-  acquiring = true;
-  // TODO
+  m_acquiring = true;
+  bool daqSuccess = true;
+
+  daqSuccess = m_daq.initHardware();
+  if (daqSuccess) {
+    daqSuccess = m_daq.prepareAcquisition(params.maxFrames);
+  }
+
+  if (daqSuccess) {
+    Q_EMIT sigAcquisitionStarted();
+
+    daqSuccess = m_daq.acquire(params.maxFrames, {});
+  }
+
+  if (!daqSuccess) {
+    const auto &daqErr = "DAQ error: " + m_daq.errMsg();
+    if (!daqErr.empty()) {
+      Q_EMIT error(QString::fromStdString(daqErr));
+    }
+  }
+
+  m_acquiring = false;
+  m_daq.finishAcquisition();
+  Q_EMIT sigAcquisitionFinished();
 }
 
 AcquisitionController::AcquisitionController(
@@ -59,12 +83,17 @@ AcquisitionController::AcquisitionController(
             });
 
     // State changed to stopped
-    connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionStarted,
+    connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionFinished,
             this, [this]() {
               this->setEnabled(true);
               m_btnStartStopAcquisition->setText("Start");
               m_btnStartStopAcquisition->setStyleSheet(
                   "background-color: green");
+            });
+
+    connect(&m_controller, &AcquisitionControllerObj::error, this,
+            [this](const QString &msg) {
+              QMessageBox::information(this, "Acquisition controller", msg);
             });
   }
 

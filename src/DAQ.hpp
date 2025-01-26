@@ -39,8 +39,9 @@ public:
   bool isInitialized() const noexcept { return board != nullptr; }
 
   // Must be called before acquisition
-  bool prepareAcquisition() noexcept;
-  bool acquire(int buffersToAcquire) noexcept;
+  bool prepareAcquisition(int maxBuffersToAcquire) noexcept;
+  bool acquire(int buffersToAcquire,
+               const std::function<void()> &callback) noexcept;
 
   // CLean up resources allocated by prepareAcquisition
   void finishAcquisition() noexcept {
@@ -48,6 +49,8 @@ public:
       m_fs.close();
     }
   }
+
+  void setShouldStopAcquiring() { shouldStopAcquiring = true; }
 
   void setSaveData(bool save) noexcept { m_saveData = save; }
   void setSaveDir(fs::path savedir) noexcept { m_savedir = std::move(savedir); }
@@ -69,7 +72,7 @@ private:
   static constexpr size_t num_buffers{16};
   std::array<std::span<uint16_t>, num_buffers> buffers{};
 
-  uint32_t recordSize = 2 * 2048;   // ALine size
+  uint32_t recordSize = 3 * 2048;   // ALine size
   uint32_t recordsPerBuffer = 2200; // ALines per BScan
   uint32_t channelMask{};
 

@@ -372,30 +372,37 @@ bool DAQ::initHardware() noexcept {
   RETURN_BOOL_IF_FAIL();
 
   // Channel A
-  channelMask = 0;
-  channelMask |= CHANNEL_A;
-  ALAZAR_CALL(AlazarInputControlEx(board, CHANNEL_A, DC_COUPLING,
-                                   INPUT_RANGE_PM_2_V, IMPEDANCE_50_OHM));
+  channelMask = CHANNEL_A;
+  ALAZAR_CALL(AlazarInputControl(board, CHANNEL_A, DC_COUPLING,
+                                 INPUT_RANGE_PM_2_V, IMPEDANCE_50_OHM));
   RETURN_BOOL_IF_FAIL();
 
   // Channel B (unused)
+  ALAZAR_CALL(AlazarInputControl(board, CHANNEL_B, DC_COUPLING,
+                                 INPUT_RANGE_PM_800_MV, IMPEDANCE_50_OHM));
+  RETURN_BOOL_IF_FAIL();
 
   // External trigger channel (5V DC Coupling)
-  ALAZAR_CALL(AlazarSetExternalTrigger(board, DC_COUPLING, ETR_5V));
-  RETURN_BOOL_IF_FAIL();
-
-  ALAZAR_CALL(AlazarSetTriggerTimeOut(board, 0));
-  RETURN_BOOL_IF_FAIL();
-
-  // Trigger operation
   ALAZAR_CALL(AlazarSetTriggerOperation(board, TRIG_ENGINE_OP_J, TRIG_ENGINE_J,
                                         TRIG_EXTERNAL, TRIGGER_SLOPE_NEGATIVE,
                                         160, TRIG_ENGINE_K, TRIG_DISABLE,
                                         TRIGGER_SLOPE_POSITIVE, 128));
   RETURN_BOOL_IF_FAIL();
+
+  ALAZAR_CALL(AlazarSetExternalTrigger(board, DC_COUPLING, ETR_5V));
+  RETURN_BOOL_IF_FAIL();
+
+  ALAZAR_CALL(AlazarSetTriggerDelay(board, 0));
+  RETURN_BOOL_IF_FAIL();
+
+  ALAZAR_CALL(AlazarSetTriggerTimeOut(board, 0));
+  RETURN_BOOL_IF_FAIL();
+
+  ALAZAR_CALL(AlazarConfigureAuxIO(board, AUX_OUT_TRIGGER, 0));
+  return success;
 }
 
-bool DAQ::prepareAcquisition() noexcept {
+bool DAQ::prepareAcquisition(int maxBuffersToAcquire) noexcept {
   m_errMsg.clear();
 
   if (m_saveData) {
@@ -434,7 +441,7 @@ bool DAQ::prepareAcquisition() noexcept {
 
   // Free all memory allocated
   for (auto &buf : buffers) {
-    if (buf.size() >= 0) {
+    if (buf.size() > 0) {
       AlazarFreeBufferU16(board, buf.data());
       buf = {};
     }
@@ -447,7 +454,7 @@ bool DAQ::prepareAcquisition() noexcept {
       qCritical("Error: Alloc %u bytes failed", bytesPerBuffer);
       return false;
     }
-    buf = std::span(ptr, recordsPerBuffer);
+    buf = std::span(ptr, bytesPerBuffer / 2);
     qDebug("Allocated %d bytes of memory", bytesPerBuffer);
   }
 
@@ -458,7 +465,8 @@ bool DAQ::prepareAcquisition() noexcept {
   return success;
 }
 
-bool DAQ::acquire(int buffersToAcquire) noexcept {
+bool DAQ::acquire(int buffersToAcquire,
+                  const std::function<void()> &callback) noexcept {
   shouldStopAcquiring = false;
   acquiringData = true;
   defer { acquiringData = false; };
@@ -470,9 +478,10 @@ bool DAQ::acquire(int buffersToAcquire) noexcept {
   U32 recordsPerAcquisition = recordsPerBuffer * buffersToAcquire;
   U32 admaFlags =
       ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
-  ALAZAR_CALL(AlazarBeforeAsyncRead(
-      board, channelMask, 0, recordSize * recordsPerBuffer, recordsPerBuffer,
-      recordsPerAcquisition, admaFlags));
+  const auto transferLength = recordSize * recordsPerBuffer;
+  ALAZAR_CALL(AlazarBeforeAsyncRead(board, channelMask, 0, transferLength,
+                                    recordsPerBuffer, recordsPerAcquisition,
+                                    admaFlags));
   RETURN_BOOL_IF_FAIL();
 
   // Add the buffers to a list of buffers available to be filled by the board
@@ -488,15 +497,23 @@ bool DAQ::acquire(int buffersToAcquire) noexcept {
     ALAZAR_CALL(AlazarAbortAsyncRead(board));
   };
 
+  ALAZAR_CALL(AlazarStartCapture(board));
+  RETURN_BOOL_IF_FAIL();
+
   uint32_t buffersCompleted = 0;
   uint32_t bufferIdx = 0;
-  while (buffersCompleted < buffersToAcquire) {
-    bufferIdx = buffersCompleted & buffers.size();
-    auto &buf = buffers[bufferIdx];
+  while (success && !shouldStopAcquiring &&
+         buffersCompleted < buffersToAcquire) {
+    if (callback) {
+      callback();
+    }
+
+    bufferIdx = buffersCompleted % buffers.size();
+    auto &buf = buffers[bufferIdx]; // NOLINT(*-array-index)
     const auto bytesPerBuffer = buf.size() * sizeof(uint16_t);
 
-    constexpr uint32_t timeout_ms = 2000;
-    auto ret = AlazarWaitAsyncBufferComplete(board, buf.data(), timeout_ms);
+    constexpr uint32_t timeout_ms = 1000;
+    ret = AlazarWaitAsyncBufferComplete(board, buf.data(), timeout_ms);
 
     success = false;
     switch (ret) {
@@ -508,7 +525,11 @@ bool DAQ::acquire(int buffersToAcquire) noexcept {
         dat->i = buffersCompleted - 1;
 
         // Copy data from alazar buffer to ring buffer
-        std::copy(buf.begin(), buf.end(), dat->fringe.begin());
+        auto &fringe = dat->fringe;
+        if (fringe.size() < buf.size()) {
+          fringe.resize(buf.size());
+        }
+        std::copy(buf.data(), buf.data() + buf.size(), fringe.data());
       });
 
       // Save
@@ -530,6 +551,7 @@ bool DAQ::acquire(int buffersToAcquire) noexcept {
         }
       }
     } break;
+
     case ApiWaitTimeout: {
       m_errMsg = "DAQ: AlazarWaitAsyncBufferComplete timeout. Please make sure "
                  "the trigger is connected.";
@@ -543,12 +565,24 @@ bool DAQ::acquire(int buffersToAcquire) noexcept {
           "memory to host memory.";
       qCritical() << m_errMsg;
     } break;
+
+    case ApiBufferNotReady: {
+      m_errMsg = "DAQ: AlazarWaitAsyncBufferComplete (573) buffer not ready. "
+                 "The buffer passed as argument is not ready to be called with "
+                 "this API. ";
+      qCritical() << m_errMsg;
+    } break;
+
     default: {
       m_errMsg = fmt::format(
           "DAQ: AlazarWaitAsyncBufferComplete returned unknown code {}",
           static_cast<uint32_t>(ret));
       qCritical() << m_errMsg;
     }
+    }
+
+    if (!success) {
+      break;
     }
 
     ALAZAR_CALL(AlazarPostAsyncBuffer(board, buf.data(), bytesPerBuffer));

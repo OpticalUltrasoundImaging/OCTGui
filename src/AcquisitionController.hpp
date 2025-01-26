@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QString>
 #include <QThread>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -29,18 +30,22 @@ public:
       const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer);
 
   auto &daq() { return m_daq; }
-  bool isAcquiring() const { return acquiring; }
+  bool isAcquiring() const { return m_acquiring; }
   void startAcquisition(AcquisitionParams params);
 
-  void stopAcquisition() { acquiring = false; }
+  void stopAcquisition() {
+    m_acquiring = false;
+    m_daq.setShouldStopAcquiring();
+  }
 
 Q_SIGNALS:
   void sigAcquisitionStarted();
   void sigAcquisitionFinished();
+  void error(QString msg);
 
 private:
   daq::DAQ m_daq;
-  std::atomic<bool> acquiring{false};
+  std::atomic<bool> m_acquiring{false};
 };
 
 class AcquisitionController : public QWidget {
