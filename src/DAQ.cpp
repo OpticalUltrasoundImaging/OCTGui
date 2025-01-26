@@ -521,16 +521,17 @@ bool DAQ::acquire(int buffersToAcquire,
       success = true;
       buffersCompleted++;
 
-      m_ringBuffer->produce([&, this](std::shared_ptr<OCTData<Float>> &dat) {
-        dat->i = buffersCompleted - 1;
+      m_ringBuffer->produce_nolock(
+          [&, this](std::shared_ptr<OCTData<Float>> &dat) {
+            dat->i = buffersCompleted - 1;
 
-        // Copy data from alazar buffer to ring buffer
-        auto &fringe = dat->fringe;
-        if (fringe.size() < buf.size()) {
-          fringe.resize(buf.size());
-        }
-        std::copy(buf.data(), buf.data() + buf.size(), fringe.data());
-      });
+            // Copy data from alazar buffer to ring buffer
+            auto &fringe = dat->fringe;
+            if (fringe.size() < buf.size()) {
+              fringe.resize(buf.size());
+            }
+            std::copy(buf.data(), buf.data() + buf.size(), fringe.data());
+          });
 
       // Save
       if (m_fs.is_open()) {
