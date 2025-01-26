@@ -26,6 +26,8 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
+#include <qdockwidget.h>
+#include <qnamespace.h>
 
 namespace OCT {
 
@@ -98,6 +100,19 @@ MainWindow::MainWindow()
     dock->hide();
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
+
+#ifdef OCTGUI_HAS_ALAZAR
+  // Acquisition
+  {
+    m_acqController = new AcquisitionController(m_ringBuffer);
+
+    auto *dock = new QDockWidget("Acquisition control");
+    addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+
+    dock->setWidget(m_acqController);
+  }
+#endif
 
   // Other actions
   // -------------

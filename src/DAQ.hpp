@@ -8,7 +8,6 @@ Implements a data acquisition interface
 #include "Common.hpp"
 #include "OCTData.hpp"
 #include "RingBuffer.hpp"
-#include <AlazarApi.h>
 #include <array>
 #include <atomic>
 #include <filesystem>
@@ -26,7 +25,7 @@ std::string getDAQInfo();
 class DAQ {
 public:
   explicit DAQ(std::shared_ptr<RingBuffer<OCTData<Float>>> buffer)
-      : m_buffer(std::move(buffer)) {}
+      : m_ringBuffer(std::move(buffer)) {}
 
   DAQ(const DAQ &) = delete;
   DAQ(DAQ &&) = delete;
@@ -57,7 +56,7 @@ public:
 
 private:
   // Ring buffer
-  std::shared_ptr<RingBuffer<OCTData<Float>>> m_buffer;
+  std::shared_ptr<RingBuffer<OCTData<Float>>> m_ringBuffer;
 
   // Control states
   std::atomic<bool> shouldStopAcquiring{false};
@@ -67,11 +66,12 @@ private:
   void *board{};
 
   // Alazar buffers
-  std::array<std::span<uint16_t>, 20> buffers{};
+  static constexpr size_t num_buffers{16};
+  std::array<std::span<uint16_t>, num_buffers> buffers{};
 
-  // Channels to capture
-  const U32 channelMask = CHANNEL_A;
-  const int channelCount = 1;
+  uint32_t recordSize = 2 * 2048;   // ALine size
+  uint32_t recordsPerBuffer = 2200; // ALines per BScan
+  uint32_t channelMask{};
 
   // Sampling rate
   double samplesPerSec = 0.0;

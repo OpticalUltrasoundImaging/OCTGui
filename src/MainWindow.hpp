@@ -19,6 +19,10 @@
 #include <QThread>
 #include <memory>
 
+#ifdef OCTGUI_HAS_ALAZAR
+#include "AcquisitionController.hpp"
+#endif
+
 namespace OCT {
 
 // NOLINTNEXTLINE(*-member-functions)
@@ -52,6 +56,11 @@ private:
   QThread m_workerThread;
 
   ExportSettingsWidget *m_exportSettingsWidget;
+
+#ifdef OCTGUI_HAS_ALAZAR
+  // Acquisition
+  AcquisitionController *m_acqController;
+#endif
 
   void tryLoadCalibDirectory(const QString &calibDir);
   void tryLoadDatDirectory(const QString &dir);

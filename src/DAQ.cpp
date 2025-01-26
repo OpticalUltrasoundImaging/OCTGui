@@ -1,12 +1,14 @@
 #include "DAQ.hpp"
+#include <qlogging.h>
 
 #ifdef OCTGUI_HAS_ALAZAR
 
+#include "datetime.hpp"
+#include "defer.h"
+#include "timeit.hpp"
 #include <AlazarApi.h>
 #include <AlazarCmd.h>
 #include <AlazarError.h>
-
-#include "defer.h"
 #include <QDebug>
 #include <fmt/core.h>
 #include <ios>
@@ -352,6 +354,217 @@ std::string getDAQInfo() {
   return ss.str();
 }
 
+bool DAQ::initHardware() noexcept {
+  RETURN_CODE ret{ApiSuccess};
+  bool success{true};
+
+  board = AlazarGetBoardBySystemID(1, 1);
+  if (board == nullptr) {
+    m_errMsg = "Failed to initialize Alazar board.";
+  }
+
+  // Samples per sec
+  samplesPerSec = 180e6;
+
+  // Select clock parameters required to generate this sample rate
+  ALAZAR_CALL(AlazarSetCaptureClock(board, INTERNAL_CLOCK, SAMPLE_RATE_180MSPS,
+                                    CLOCK_EDGE_RISING, 0));
+  RETURN_BOOL_IF_FAIL();
+
+  // Channel A
+  channelMask = 0;
+  channelMask |= CHANNEL_A;
+  ALAZAR_CALL(AlazarInputControlEx(board, CHANNEL_A, DC_COUPLING,
+                                   INPUT_RANGE_PM_2_V, IMPEDANCE_50_OHM));
+  RETURN_BOOL_IF_FAIL();
+
+  // Channel B (unused)
+
+  // External trigger channel (5V DC Coupling)
+  ALAZAR_CALL(AlazarSetExternalTrigger(board, DC_COUPLING, ETR_5V));
+  RETURN_BOOL_IF_FAIL();
+
+  ALAZAR_CALL(AlazarSetTriggerTimeOut(board, 0));
+  RETURN_BOOL_IF_FAIL();
+
+  // Trigger operation
+  ALAZAR_CALL(AlazarSetTriggerOperation(board, TRIG_ENGINE_OP_J, TRIG_ENGINE_J,
+                                        TRIG_EXTERNAL, TRIGGER_SLOPE_NEGATIVE,
+                                        160, TRIG_ENGINE_K, TRIG_DISABLE,
+                                        TRIGGER_SLOPE_POSITIVE, 128));
+  RETURN_BOOL_IF_FAIL();
+}
+
+bool DAQ::prepareAcquisition() noexcept {
+  m_errMsg.clear();
+
+  if (m_saveData) {
+    // TODO: save number of ALines per Bscan etc.
+    const auto fname =
+        fmt::format("OCTGui_{}.bin", datetime::datetimeFormat("%H%M%S"));
+    m_lastBinfile = m_savedir / fname;
+    m_fs = std::fstream(m_lastBinfile, std::ios::out | std::ios::binary);
+
+    if (m_fs.is_open()) {
+      m_errMsg =
+          "Failed to open binfile for writing: " + m_lastBinfile.string();
+      return false;
+    }
+  } else {
+    m_lastBinfile.clear();
+  }
+
+  // Prime the board
+
+  uint8_t bitsPerSample{};
+  U32 maxSamplesPerChannel{};
+
+  RETURN_CODE ret{ApiSuccess};
+  bool success{true};
+
+  ALAZAR_CALL(
+      AlazarGetChannelInfo(board, &maxSamplesPerChannel, &bitsPerSample));
+  RETURN_BOOL_IF_FAIL();
+
+  const auto channelCount = 1;
+
+  const auto bytesPerSample = (float)((bitsPerSample + 7) / 8);
+  const U32 bytesPerRecord = (U32)(bytesPerSample * recordSize + 0.5);
+  const U32 bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount;
+
+  // Free all memory allocated
+  for (auto &buf : buffers) {
+    if (buf.size() >= 0) {
+      AlazarFreeBufferU16(board, buf.data());
+      buf = {};
+    }
+  }
+
+  for (auto &buf : buffers) {
+    // Allocate page aligned memory
+    auto *ptr = AlazarAllocBufferU16(board, bytesPerBuffer);
+    if (ptr == nullptr) {
+      qCritical("Error: Alloc %u bytes failed", bytesPerBuffer);
+      return false;
+    }
+    buf = std::span(ptr, recordsPerBuffer);
+    qDebug("Allocated %d bytes of memory", bytesPerBuffer);
+  }
+
+  // Configure the record size
+  ALAZAR_CALL(AlazarSetRecordSize(board, 0, recordSize));
+  RETURN_BOOL_IF_FAIL();
+
+  return success;
+}
+
+bool DAQ::acquire(int buffersToAcquire) noexcept {
+  shouldStopAcquiring = false;
+  acquiringData = true;
+  defer { acquiringData = false; };
+
+  RETURN_CODE ret{ApiSuccess};
+  bool success{true};
+
+  // Configure the board to make an NPT AutoDMA acquisition
+  U32 recordsPerAcquisition = recordsPerBuffer * buffersToAcquire;
+  U32 admaFlags =
+      ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
+  ALAZAR_CALL(AlazarBeforeAsyncRead(
+      board, channelMask, 0, recordSize * recordsPerBuffer, recordsPerBuffer,
+      recordsPerAcquisition, admaFlags));
+  RETURN_BOOL_IF_FAIL();
+
+  // Add the buffers to a list of buffers available to be filled by the board
+  for (auto &buf : buffers) {
+    auto bytesPerBuffer = buf.size() * sizeof(uint16_t);
+    ALAZAR_CALL(AlazarPostAsyncBuffer(board, buf.data(), bytesPerBuffer));
+    RETURN_BOOL_IF_FAIL();
+  }
+
+  // Arm the board system to wait for a trigger event to begin acquisition
+  defer {
+    // Abort the acquisition at the end
+    ALAZAR_CALL(AlazarAbortAsyncRead(board));
+  };
+
+  uint32_t buffersCompleted = 0;
+  uint32_t bufferIdx = 0;
+  while (buffersCompleted < buffersToAcquire) {
+    bufferIdx = buffersCompleted & buffers.size();
+    auto &buf = buffers[bufferIdx];
+    const auto bytesPerBuffer = buf.size() * sizeof(uint16_t);
+
+    constexpr uint32_t timeout_ms = 2000;
+    auto ret = AlazarWaitAsyncBufferComplete(board, buf.data(), timeout_ms);
+
+    success = false;
+    switch (ret) {
+    case ApiSuccess: {
+      success = true;
+      buffersCompleted++;
+
+      m_ringBuffer->produce([&, this](std::shared_ptr<OCTData<Float>> &dat) {
+        dat->i = buffersCompleted - 1;
+
+        // Copy data from alazar buffer to ring buffer
+        std::copy(buf.begin(), buf.end(), dat->fringe.begin());
+      });
+
+      // Save
+      if (m_fs.is_open()) {
+        try {
+          TimeIt timeit;
+          m_fs.write((char *)buf.data(), bytesPerBuffer);
+
+          const auto time_ms = timeit.get_ms();
+          const auto speed_MBps = bytesPerBuffer * 1e-3 / time_ms;
+
+          qInfo("Wrote %d bytes to file in %f ms (%f MB/s)", bytesPerBuffer,
+                time_ms, speed_MBps);
+
+        } catch (std::ios_base::failure &e) {
+          qCritical("Error: write buffer %u failed -- %u", buffersCompleted,
+                    GetLastError());
+          success = false;
+        }
+      }
+    } break;
+    case ApiWaitTimeout: {
+      m_errMsg = "DAQ: AlazarWaitAsyncBufferComplete timeout. Please make sure "
+                 "the trigger is connected.";
+      qCritical() << m_errMsg;
+    } break;
+
+    case ApiBufferOverflow: {
+      m_errMsg =
+          "DAQ: AlazarWaitAsyncBufferComplete buffer overflow. The data "
+          "acquisition rate is higher than the transfer rate from on-board "
+          "memory to host memory.";
+      qCritical() << m_errMsg;
+    } break;
+    default: {
+      m_errMsg = fmt::format(
+          "DAQ: AlazarWaitAsyncBufferComplete returned unknown code {}",
+          static_cast<uint32_t>(ret));
+      qCritical() << m_errMsg;
+    }
+    }
+
+    ALAZAR_CALL(AlazarPostAsyncBuffer(board, buf.data(), bytesPerBuffer));
+  }
+
+  return success;
+}
+
+DAQ::~DAQ() {
+  for (auto &buf : buffers) {
+    if (buf.size() >= 0) {
+      AlazarFreeBufferU16(board, buf.data());
+      buf = {};
+    }
+  }
+};
 } // namespace OCT::daq
 
 #endif

@@ -52,6 +52,8 @@ qt_add_executable(${EXE_NAME}
     ExportSettings.hpp
     Overlay.hpp
     OCTReconParamsController.hpp
+    AcquisitionController.hpp
+    AcquisitionController.cpp
     ${app_icon_macos}
     ${app_icon_windows}
 )
