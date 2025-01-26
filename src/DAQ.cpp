@@ -552,33 +552,32 @@ bool DAQ::acquire(int buffersToAcquire,
       }
     } break;
 
-    case ApiWaitTimeout: {
+    case ApiWaitTimeout:
       m_errMsg = "DAQ: AlazarWaitAsyncBufferComplete timeout. Please make sure "
                  "the trigger is connected.";
       qCritical() << m_errMsg;
-    } break;
+      break;
 
-    case ApiBufferOverflow: {
+    case ApiBufferOverflow:
       m_errMsg =
           "DAQ: AlazarWaitAsyncBufferComplete buffer overflow. The data "
           "acquisition rate is higher than the transfer rate from on-board "
           "memory to host memory.";
       qCritical() << m_errMsg;
-    } break;
+      break;
 
-    case ApiBufferNotReady: {
+    case ApiBufferNotReady:
       m_errMsg = "DAQ: AlazarWaitAsyncBufferComplete (573) buffer not ready. "
                  "The buffer passed as argument is not ready to be called with "
                  "this API. ";
       qCritical() << m_errMsg;
-    } break;
+      break;
 
-    default: {
+    default:
       m_errMsg = fmt::format(
           "DAQ: AlazarWaitAsyncBufferComplete returned unknown code {}",
           static_cast<uint32_t>(ret));
       qCritical() << m_errMsg;
-    }
     }
 
     if (!success) {
