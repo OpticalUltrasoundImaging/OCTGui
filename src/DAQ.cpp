@@ -406,13 +406,13 @@ bool DAQ::prepareAcquisition(int maxBuffersToAcquire) noexcept {
   m_errMsg.clear();
 
   if (m_saveData) {
-    // TODO: save number of ALines per Bscan etc.
     const auto fname =
-        fmt::format("OCTGui_{}.bin", datetime::datetimeFormat("%H%M%S"));
+        fmt::format("OCT{}_{}.bin", datetime::datetimeFormat("%Y%m%d%H%M%S"),
+                    recordsPerBuffer);
     m_lastBinfile = m_savedir / fname;
     m_fs = std::fstream(m_lastBinfile, std::ios::out | std::ios::binary);
 
-    if (m_fs.is_open()) {
+    if (!m_fs.is_open()) {
       m_errMsg =
           "Failed to open binfile for writing: " + m_lastBinfile.string();
       return false;
