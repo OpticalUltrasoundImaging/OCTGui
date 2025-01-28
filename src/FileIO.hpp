@@ -115,11 +115,6 @@ struct DatFileReader {
   static DatFileReader readBinFile(const fs::path &filepath) {
     DatFileReader reader;
 
-    if (!fs::exists(filepath) || !filepath.has_extension() ||
-        filepath.extension() != ".bin") {
-      throw std::exception("Invalid path name");
-    }
-
     // Sequence
     reader.m_files = {filepath};
     reader.m_seq = getSequenceName(filepath);
