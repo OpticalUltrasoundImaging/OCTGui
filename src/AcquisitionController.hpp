@@ -19,9 +19,11 @@
 
 namespace OCT {
 
+// NOLINTBEGIN(*-magic-numbers)
 struct AcquisitionParams {
   int maxFrames = 400;
 };
+// NOLINTEND(*-magic-numbers)
 
 class AcquisitionControllerObj : public QObject {
   Q_OBJECT
@@ -40,7 +42,8 @@ public:
 
 Q_SIGNALS:
   void sigAcquisitionStarted();
-  void sigAcquisitionFinished();
+  void sigAcquisitionFinished(QString filepath);
+
   void error(QString msg);
 
 private:
@@ -60,6 +63,8 @@ public:
   AcquisitionController &operator=(AcquisitionController &&) = delete;
 
   ~AcquisitionController() override;
+
+  const auto &controller() const { return m_controller; }
 
 private:
   AcquisitionControllerObj m_controller;

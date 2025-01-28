@@ -1,6 +1,6 @@
 #include "AcquisitionController.hpp"
+#include "strOps.hpp"
 #include <QMessageBox>
-#include <qmessagebox.h>
 
 namespace OCT {
 
@@ -32,7 +32,7 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
 
   m_acquiring = false;
   m_daq.finishAcquisition();
-  Q_EMIT sigAcquisitionFinished();
+  Q_EMIT sigAcquisitionFinished(toQString(m_daq.binpath()));
 }
 
 AcquisitionController::AcquisitionController(
@@ -84,13 +84,11 @@ AcquisitionController::AcquisitionController(
 
     // State changed to stopped
     connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionFinished,
-            this, [this]() {
+            this, [this](const QString &filepath) {
               this->setEnabled(true);
               m_btnStartStopAcquisition->setText("Start");
               m_btnStartStopAcquisition->setStyleSheet(
                   "background-color: green");
-
-              // TODO: load saved data
             });
 
     connect(&m_controller, &AcquisitionControllerObj::error, this,

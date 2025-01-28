@@ -1,4 +1,5 @@
 #include "MainWindow.hpp"
+#include "AcquisitionController.hpp"
 #include "DAQ.hpp"
 #include "ExportSettings.hpp"
 #include "FileIO.hpp"
@@ -111,7 +112,18 @@ MainWindow::MainWindow()
     m_menuView->addAction(dock->toggleViewAction());
 
     dock->setWidget(m_acqController);
+
+    // Acq signals
+    connect(&m_acqController->controller(),
+            &AcquisitionControllerObj::sigAcquisitionStarted, this, [this]() {
+              // Clear overlay progress
+              m_imageDisplay->overlay()->setProgress(0, 0);
+            });
+    connect(&m_acqController->controller(),
+            &AcquisitionControllerObj::sigAcquisitionFinished, this,
+            &MainWindow::tryLoadBinfile);
   }
+
 #endif
 
   // Other actions
@@ -124,7 +136,7 @@ MainWindow::MainWindow()
 
     connect(act, &QAction::triggered, this, [this]() {
       const QString filename = QFileDialog::getExistingDirectory(
-          this, "Import calibration directory");
+          this, "Import calibration directory", defaultDataDir);
 
       this->tryLoadCalibDirectory(filename);
     });
@@ -136,8 +148,8 @@ MainWindow::MainWindow()
     act->setShortcut({Qt::CTRL | Qt::SHIFT | Qt::Key_O});
 
     connect(act, &QAction::triggered, this, [this]() {
-      const QString filename =
-          QFileDialog::getExistingDirectory(this, "Import DAT data directory");
+      const QString filename = QFileDialog::getExistingDirectory(
+          this, "Import DAT data directory", defaultDataDir);
       this->tryLoadDatDirectory(filename);
     });
   }
@@ -149,7 +161,7 @@ MainWindow::MainWindow()
 
     connect(act, &QAction::triggered, this, [this]() {
       const QString filename = QFileDialog::getOpenFileName(
-          this, "Select a bin file", "", "Binfile (*.bin *.dat)");
+          this, "Select a bin file", defaultDataDir, "Binfile (*.bin *.dat)");
       this->tryLoadBinfile(filename);
     });
   }

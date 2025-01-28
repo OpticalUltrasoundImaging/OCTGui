@@ -114,21 +114,22 @@ struct DatFileReader {
 
   static DatFileReader readBinFile(const fs::path &filepath) {
     DatFileReader reader;
+    if (fs::exists(filepath)) {
+      // Sequence
+      reader.m_files = {filepath};
+      reader.m_seq = getSequenceName(filepath);
 
-    // Sequence
-    reader.m_files = {filepath};
-    reader.m_seq = getSequenceName(filepath);
-
-    // Parse file name
-    {
-      const auto stem = filepath.stem().string();
-      std::regex re(R"rgx(OCT\d+_(\d+))rgx");
-      std::smatch match;
-      int linesPerFrame = 0;
-      if (std::regex_search(stem, match, re)) {
-        linesPerFrame = std::stoi(match[1].str());
+      // Parse file name
+      {
+        const auto stem = filepath.stem().string();
+        std::regex re(R"rgx(OCT\d+_(\d+))rgx");
+        std::smatch match;
+        int linesPerFrame = 0;
+        if (std::regex_search(stem, match, re)) {
+          linesPerFrame = std::stoi(match[1].str());
+        }
+        reader.determineFrameSize(linesPerFrame);
       }
-      reader.determineFrameSize(linesPerFrame);
     }
 
     return reader;

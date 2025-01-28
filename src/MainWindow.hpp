@@ -35,6 +35,12 @@ public:
 public Q_SLOTS:
   void statusBarMessage(const QString &msg) { statusBar()->showMessage(msg); }
 
+  void tryLoadCalibDirectory(const QString &calibDir);
+  void tryLoadDatDirectory(const QString &qdir);
+  void tryLoadBinfile(const QString &qpath);
+
+  void loadFrame(size_t i);
+
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
   void dropEvent(QDropEvent *event) override;
@@ -47,6 +53,11 @@ private:
   FrameController *m_frameController;
   OCTReconParamsController *m_reconParamsController;
 
+#ifdef WIN32
+  QString defaultDataDir{"C:/Data/"};
+#else
+  QString defaultDataDir{"~/data/"};
+#endif
   DatFileReader m_datReader;
   std::shared_ptr<Calibration<Float>> m_calib;
 
@@ -62,15 +73,9 @@ private:
   AcquisitionController *m_acqController;
 #endif
 
-  void tryLoadCalibDirectory(const QString &calibDir);
-  void tryLoadDatDirectory(const QString &qdir);
-  void tryLoadBinfile(const QString &qpath);
-
   // Called after a new DatReader is ready.
   // Updates UI elements with the new DatReader.
   void afterDatReaderReady();
-
-  void loadFrame(size_t i);
 };
 
 } // namespace OCT
