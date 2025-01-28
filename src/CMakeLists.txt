@@ -54,6 +54,7 @@ qt_add_executable(${EXE_NAME}
     OCTReconParamsController.hpp
     AcquisitionController.hpp
     AcquisitionController.cpp
+    MotorDriver.hpp
     ${app_icon_macos}
     ${app_icon_windows}
 )
