@@ -1,3 +1,5 @@
+#ifdef OCTGUI_HAS_ALAZAR
+
 #include "AcquisitionController.hpp"
 #include "strOps.hpp"
 #include <QMessageBox>
@@ -144,3 +146,5 @@ AcquisitionController::~AcquisitionController() {
 }
 
 } // namespace OCT
+
+#endif
