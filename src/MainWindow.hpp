@@ -47,7 +47,7 @@ private:
   FrameController *m_frameController;
   OCTReconParamsController *m_reconParamsController;
 
-  std::unique_ptr<DatReader> m_datReader;
+  DatFileReader m_datReader;
   std::shared_ptr<Calibration<Float>> m_calib;
 
   // ring buffer for reading fringes
@@ -63,7 +63,12 @@ private:
 #endif
 
   void tryLoadCalibDirectory(const QString &calibDir);
-  void tryLoadDatDirectory(const QString &dir);
+  void tryLoadDatDirectory(const QString &qdir);
+  void tryLoadBinfile(const QString &qpath);
+
+  // Called after a new DatReader is ready.
+  // Updates UI elements with the new DatReader.
+  void afterDatReaderReady();
 
   void loadFrame(size_t i);
 };

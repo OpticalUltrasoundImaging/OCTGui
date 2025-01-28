@@ -89,6 +89,8 @@ AcquisitionController::AcquisitionController(
               m_btnStartStopAcquisition->setText("Start");
               m_btnStartStopAcquisition->setStyleSheet(
                   "background-color: green");
+
+              // TODO: load saved data
             });
 
     connect(&m_controller, &AcquisitionControllerObj::error, this,
