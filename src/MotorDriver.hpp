@@ -3,10 +3,12 @@
 #include <QComboBox>
 #include <QGridLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QSpinBox>
+#include <QVBoxLayout>
 #include <QWidget>
 #include <fmt/core.h>
 
@@ -32,32 +34,54 @@ public:
       : QWidget(parent), m_cbPort(new QComboBox), m_btnDir(new QPushButton),
         m_btnRunStop(new QPushButton), m_sbPeriod(new QSpinBox) {
 
+    auto *_layout = new QVBoxLayout;
+    setLayout(_layout);
     auto *grid = new QGridLayout;
-    setLayout(grid);
+    _layout->addLayout(grid);
 
     int row = 0;
 
     {
       auto *lbl = new QLabel("Serial port:");
       grid->addWidget(lbl, row, 0);
-      grid->addWidget(m_cbPort, row++, 1);
+      grid->addWidget(m_cbPort, row, 1);
+
+      // connect(m_cbPort, &QComboBox::currentTextChanged, this,
+      //         [this](const QString &text) {
+      //           if (!text.isEmpty()) {
+      //             m_portName = text;
+      //             openPort();
+      //           }
+      //         });
+    }
+
+    {
+      auto *btn = new QPushButton("Connect");
+      connect(btn, &QPushButton::clicked, this, &MotorDriver::openPort);
+      grid->addWidget(btn, row++, 2);
     }
 
     {
       auto *lbl = new QLabel("Period (us):");
       grid->addWidget(lbl, row, 0);
-      grid->addWidget(m_sbPeriod, row++, 1);
+      grid->addWidget(m_sbPeriod, row, 1);
 
-      m_sbPeriod->setRange(0, 1e6);
+      m_sbPeriod->setRange(0, 1e6); // NOLINT(*-numbers)
       m_sbPeriod->setValue(m_period_us);
 
-      connect(m_sbPeriod, &QSpinBox::valueChanged, this,
-              &MotorDriver::setPeriod);
+      connect(m_sbPeriod, &QSpinBox::editingFinished,
+              [this]() { setPeriod(m_sbPeriod->value()); });
     }
 
     {
-      grid->addWidget(m_btnDir, row, 0);
-      grid->addWidget(m_btnRunStop, row++, 1);
+      auto *btn = new QPushButton("Refresh ports");
+      connect(btn, &QPushButton::clicked, this, &MotorDriver::refreshPorts);
+      grid->addWidget(btn, row++, 2);
+    }
+
+    {
+      grid->addWidget(m_btnDir, row, 1);
+      grid->addWidget(m_btnRunStop, row, 2);
 
       m_btnDir->setCheckable(true);
       connect(m_btnDir, &QPushButton::clicked, this,
@@ -68,14 +92,30 @@ public:
               &MotorDriver::handleRunStopButton);
     }
 
-    // Setup serial port
+    // Refresh ports BEFORE error handler connects so no error is shown at the
+    // start
     refreshPorts();
-    openPort();
+    setControlsEnabled(false);
+
+    // Error handling
+    {
+      connect(
+          this, &MotorDriver::error, this,
+          [this](const QString &msg) {
+            QMessageBox::information(this, "Motor driver error", msg);
+          },
+          Qt::QueuedConnection);
+    }
 
     m_btnDir->setChecked(false);
     m_btnRunStop->setChecked(false);
+
+    // Setup serial port
+    openPort();
+
     handleDirectionButton(false);
     handleRunStopButton(false);
+    setPeriod(m_period_us);
   };
 
   bool refreshPorts() {
@@ -89,21 +129,37 @@ public:
 
   [[nodiscard]] bool isOpen() const { return m_port.isOpen(); }
 
+Q_SIGNALS:
+  void error(QString msg);
+
+public Q_SLOTS:
   bool openPort() {
     if (m_port.isOpen()) {
       m_port.close();
     }
+
     m_portName = m_cbPort->currentText();
     m_port.setPortName(m_portName);
     m_port.setBaudRate(m_BaudRate);
 
     if (m_port.open(QIODevice::ReadWrite)) {
+      const auto resp = readResp(2000);
+      if (!resp.startsWith("OCT Motor Driver")) {
+        Q_EMIT error("The COM port does not advertise an 'OCT Motor Driver'");
+        m_port.close();
+        return false;
+      }
+
       setDirection(m_direction);
       setPeriod(m_period_us);
 
       setControlsEnabled(true);
       return true;
     }
+
+    // Can't open
+    QString msg = "Can't open port " + m_portName;
+    Q_EMIT error(msg);
 
     setControlsEnabled(false);
     return false;
@@ -114,7 +170,6 @@ public:
     m_btnRunStop->setEnabled(enabled);
   }
 
-public Q_SLOTS:
   void handleDirectionButton(bool checked) {
     m_btnDir->setText(checked ? "Pushing" : "Pulling");
     if (m_port.isOpen()) {
@@ -125,14 +180,17 @@ public Q_SLOTS:
   void setDirection(bool dir) {
     if (m_port.isOpen()) {
       m_direction = dir;
-      m_port.write(m_direction ? "d1" : "d0");
+      const auto resp = writeRequest(m_direction ? "d1\n" : "d0\n");
+      qDebug() << "Set direction:" << resp;
     }
   }
+
   void setPeriod(int period) {
     if (m_port.isOpen()) {
       m_period_us = period;
-      const auto msg = fmt::format("p{}", period);
-      m_port.write(msg.c_str());
+      const auto buf = fmt::format("p{}\n", period);
+      const auto resp = writeRequest(buf.c_str());
+      qDebug() << "Set period:" << resp;
     }
   }
 
@@ -149,14 +207,16 @@ public Q_SLOTS:
   void run() {
     if (m_port.isOpen()) {
       m_running = true;
-      m_port.write("r");
+      const auto resp = writeRequest("r\n");
+      qDebug() << "Run:" << resp;
     }
   }
 
   void stop() {
     if (m_port.isOpen()) {
       m_running = false;
-      m_port.write("s");
+      const auto resp = writeRequest("s\n");
+      qDebug() << "Stop:" << resp;
     }
   }
 
@@ -175,5 +235,53 @@ private:
   // Variables
   bool m_running{false};
   bool m_direction{false};
-  int m_period_us{625};
+  int m_period_us{312};
+
+  // Buffers
+  QByteArray m_respData;
+
+  QString writeRequest(const char *buf) {
+    QString resp;
+    if (m_port.isOpen()) {
+      // Write request
+      m_port.write(buf);
+
+      if (m_port.waitForBytesWritten(10)) {
+        resp = readResp();
+      } else {
+        Q_EMIT error("Wait write request timeout");
+      }
+    } else {
+      if (openPort()) {
+        resp = writeRequest(buf);
+      } else {
+        Q_EMIT error("Write request aborted because port cannot be opened.");
+      }
+    }
+    return resp;
+  }
+
+  // Response is always terminated by double new lines
+  QString readResp(int timeout_ms = 1000) {
+    QString resp;
+    while (true) {
+      if (m_port.waitForReadyRead(timeout_ms)) {
+        m_respData += m_port.readAll();
+
+        if (m_respData.contains("\r\n\r\n")) {
+          const auto endIndex = m_respData.indexOf("\r\n\r\n") + 4;
+          resp = QString::fromUtf8(m_respData.left(endIndex));
+          m_respData.remove(0, endIndex);
+          break;
+        }
+      } else {
+        const auto err = m_port.error();
+        if (err != QSerialPort::NoError && err != QSerialPort::TimeoutError) {
+          Q_EMIT error("Serial port error: " + m_port.errorString());
+          break;
+        }
+      }
+    }
+    return resp;
+  }
 };
