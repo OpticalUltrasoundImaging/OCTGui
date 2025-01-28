@@ -51,8 +51,8 @@ public:
       m_sbPeriod->setRange(0, 1e6);
       m_sbPeriod->setValue(m_period_us);
 
-      QWidget::connect(m_sbPeriod, &QSpinBox::valueChanged, this,
-                       &MotorDriver::setPeriod);
+      connect(m_sbPeriod, &QSpinBox::valueChanged, this,
+              &MotorDriver::setPeriod);
     }
 
     {
@@ -60,17 +60,17 @@ public:
       grid->addWidget(m_btnRunStop, row++, 1);
 
       m_btnDir->setCheckable(true);
-      QWidget::connect(m_btnDir, &QPushButton::clicked, this,
-                       &MotorDriver::handleDirectionButton);
+      connect(m_btnDir, &QPushButton::clicked, this,
+              &MotorDriver::handleDirectionButton);
 
       m_btnRunStop->setCheckable(true);
-      QWidget::connect(m_btnRunStop, &QPushButton::clicked, this,
-                       &MotorDriver::handleRunStopButton);
+      connect(m_btnRunStop, &QPushButton::clicked, this,
+              &MotorDriver::handleRunStopButton);
     }
 
     // Setup serial port
     refreshPorts();
-    connect();
+    openPort();
 
     m_btnDir->setChecked(false);
     m_btnRunStop->setChecked(false);
@@ -89,7 +89,7 @@ public:
 
   [[nodiscard]] bool isOpen() const { return m_port.isOpen(); }
 
-  bool connect() {
+  bool openPort() {
     if (m_port.isOpen()) {
       m_port.close();
     }
@@ -100,9 +100,18 @@ public:
     if (m_port.open(QIODevice::ReadWrite)) {
       setDirection(m_direction);
       setPeriod(m_period_us);
+
+      setControlsEnabled(true);
       return true;
     }
+
+    setControlsEnabled(false);
     return false;
+  }
+
+  void setControlsEnabled(bool enabled) {
+    m_btnDir->setEnabled(enabled);
+    m_btnRunStop->setEnabled(enabled);
   }
 
 public Q_SLOTS:
