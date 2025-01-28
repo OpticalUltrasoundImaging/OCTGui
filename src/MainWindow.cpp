@@ -5,6 +5,7 @@
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
+#include "MotorDriver.hpp"
 #include "OCTRecon.hpp"
 #include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
@@ -125,6 +126,14 @@ MainWindow::MainWindow()
   }
 
 #endif
+  // Motor Driver
+  {
+    auto *m_motorDriver = new MotorDriver;
+    auto *dock = new QDockWidget("Motor control");
+    addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+    dock->setWidget(m_motorDriver);
+  }
 
   // Other actions
   // -------------

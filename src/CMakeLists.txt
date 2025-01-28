@@ -5,7 +5,7 @@ find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 find_package(TBB CONFIG REQUIRED)
-find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Gui)
+find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Gui SerialPort)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 
@@ -54,6 +54,7 @@ qt_add_executable(${EXE_NAME}
     OCTReconParamsController.hpp
     AcquisitionController.hpp
     AcquisitionController.cpp
+    MotorDriver.hpp
     ${app_icon_macos}
     ${app_icon_windows}
 )
@@ -77,6 +78,7 @@ target_link_libraries(${EXE_NAME} PRIVATE
     fmt::fmt
     Qt::Widgets
     Qt::Gui
+    Qt::SerialPort
     ${QCUSTOMPLOT_LIBRARY}
     opencv_world
     FFTW3::fftw3
