@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "ExportSettings.hpp"
 #include "ImageDisplay.hpp"
+#include "OCTData.hpp"
 #include "OCTRecon.hpp"
 #include "RingBuffer.hpp"
 #include <QImage>
@@ -56,7 +57,12 @@ public Q_SLOTS:
     while (!shouldStop) {
 
       m_ringBuffer->consume([this](std::shared_ptr<OCTData<Float>> &dat) {
-        if (m_calib == nullptr || dat == nullptr) {
+        if (m_calib == nullptr) {
+          Q_EMIT statusMessage("No calibration loaded!");
+          return;
+        }
+
+        if (dat == nullptr) {
           return;
         }
 

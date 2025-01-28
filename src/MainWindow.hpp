@@ -19,6 +19,10 @@
 #include <QThread>
 #include <memory>
 
+#ifdef OCTGUI_HAS_ALAZAR
+#include "AcquisitionController.hpp"
+#endif
+
 namespace OCT {
 
 // NOLINTNEXTLINE(*-member-functions)
@@ -30,6 +34,12 @@ public:
 
 public Q_SLOTS:
   void statusBarMessage(const QString &msg) { statusBar()->showMessage(msg); }
+
+  void tryLoadCalibDirectory(const QString &calibDir);
+  void tryLoadDatDirectory(const QString &qdir);
+  void tryLoadBinfile(const QString &qpath);
+
+  void loadFrame(size_t i);
 
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
@@ -43,7 +53,12 @@ private:
   FrameController *m_frameController;
   OCTReconParamsController *m_reconParamsController;
 
-  std::unique_ptr<DatReader> m_datReader;
+#ifdef WIN32
+  QString defaultDataDir{"C:/Data/"};
+#else
+  QString defaultDataDir{"~/data/"};
+#endif
+  DatFileReader m_datReader;
   std::shared_ptr<Calibration<Float>> m_calib;
 
   // ring buffer for reading fringes
@@ -53,10 +68,14 @@ private:
 
   ExportSettingsWidget *m_exportSettingsWidget;
 
-  void tryLoadCalibDirectory(const QString &calibDir);
-  void tryLoadDatDirectory(const QString &dir);
+#ifdef OCTGUI_HAS_ALAZAR
+  // Acquisition
+  AcquisitionController *m_acqController;
+#endif
 
-  void loadFrame(size_t i);
+  // Called after a new DatReader is ready.
+  // Updates UI elements with the new DatReader.
+  void afterDatReaderReady();
 };
 
 } // namespace OCT

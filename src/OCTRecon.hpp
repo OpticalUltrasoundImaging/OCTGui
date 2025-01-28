@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.hpp"
 #include "phasecorr.hpp"
 #include "timeit.hpp"
 #include <cassert>
@@ -25,9 +26,6 @@
 namespace OCT {
 
 namespace fs = std::filesystem;
-
-template <typename T>
-concept Floating = std::is_same_v<T, double> || std::is_same_v<T, float>;
 
 template <typename T>
 void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
@@ -95,15 +93,6 @@ template <Floating T> struct OCTReconParams {
 
   // Change the rotation of the image
   int additionalOffset = 0;
-};
-
-template <Floating T> struct OCTData {
-  fftconv::AlignedVector<uint16_t> fringe;
-  size_t i{};
-
-  cv::Mat_<uint8_t> imgRect;
-  cv::Mat_<uint8_t> imgRadial;
-  cv::Mat_<uint8_t> imgCombined;
 };
 
 template <typename T, typename Tout = T>

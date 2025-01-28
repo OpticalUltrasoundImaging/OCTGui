@@ -6,7 +6,7 @@
 #include <fftconv/aligned_vector.hpp>
 #include <mutex>
 
-template <typename T, size_t Size = 3> class RingBuffer {
+template <typename T, size_t Size = 8> class RingBuffer {
 public:
   using ValueType = std::shared_ptr<T>;
 
@@ -41,7 +41,22 @@ public:
     if (full) {
       tail = (tail + 1) % buffer.size();
     }
-    qDebug() << "Produce at tail " << tail;
+    qDebug() << "Produce at head " << head;
+    produceFunc(buffer[head]);
+    head = (head + 1) % buffer.size();
+    full = head == tail;
+    notEmpty.notify_one();
+    return true;
+  }
+
+  // Add an element to the buffer. The `produceFunc` should take `T&` and write
+  // to it
+  template <typename Func> bool produce_nolock(const Func &produceFunc) {
+    // std::unique_lock<std::mutex> lock(mutex);
+    if (full) {
+      tail = (tail + 1) % buffer.size();
+    }
+    qDebug() << "Produce at head " << head;
     produceFunc(buffer[head]);
     head = (head + 1) % buffer.size();
     full = head == tail;

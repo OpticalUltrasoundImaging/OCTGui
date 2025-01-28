@@ -1,4 +1,6 @@
 #include "MainWindow.hpp"
+#include "AcquisitionController.hpp"
+#include "DAQ.hpp"
 #include "ExportSettings.hpp"
 #include "FileIO.hpp"
 #include "FrameController.hpp"
@@ -13,6 +15,7 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QStackedLayout>
 #include <QStandardPaths>
@@ -24,6 +27,8 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
+#include <qdockwidget.h>
+#include <qnamespace.h>
 
 namespace OCT {
 
@@ -34,8 +39,8 @@ MainWindow::MainWindow()
       m_reconParamsController(new OCTReconParamsController),
 
       m_ringBuffer(std::make_shared<RingBuffer<OCTData<Float>>>()),
-      m_worker(
-          new ReconWorker(m_ringBuffer, DatReader::ALineSize, m_imageDisplay)),
+      m_worker(new ReconWorker(m_ringBuffer, DatFileReader::ALineSize,
+                               m_imageDisplay)),
 
       m_exportSettingsWidget(new ExportSettingsWidget) {
 
@@ -97,6 +102,30 @@ MainWindow::MainWindow()
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
 
+#ifdef OCTGUI_HAS_ALAZAR
+  // Acquisition
+  {
+    m_acqController = new AcquisitionController(m_ringBuffer);
+
+    auto *dock = new QDockWidget("Acquisition control");
+    addDockWidget(Qt::TopDockWidgetArea, dock);
+    m_menuView->addAction(dock->toggleViewAction());
+
+    dock->setWidget(m_acqController);
+
+    // Acq signals
+    connect(&m_acqController->controller(),
+            &AcquisitionControllerObj::sigAcquisitionStarted, this, [this]() {
+              // Clear overlay progress
+              m_imageDisplay->overlay()->setProgress(0, 0);
+            });
+    connect(&m_acqController->controller(),
+            &AcquisitionControllerObj::sigAcquisitionFinished, this,
+            &MainWindow::tryLoadBinfile);
+  }
+
+#endif
+
   // Other actions
   // -------------
   m_menuView->addAction(m_imageDisplay->actResetZoom());
@@ -107,7 +136,7 @@ MainWindow::MainWindow()
 
     connect(act, &QAction::triggered, this, [this]() {
       const QString filename = QFileDialog::getExistingDirectory(
-          this, "Import calibration directory");
+          this, "Import calibration directory", defaultDataDir);
 
       this->tryLoadCalibDirectory(filename);
     });
@@ -116,13 +145,24 @@ MainWindow::MainWindow()
   {
     auto *act = new QAction("Open DAT data directory");
     m_menuFile->addAction(act);
+    act->setShortcut({Qt::CTRL | Qt::SHIFT | Qt::Key_O});
+
+    connect(act, &QAction::triggered, this, [this]() {
+      const QString filename = QFileDialog::getExistingDirectory(
+          this, "Import DAT data directory", defaultDataDir);
+      this->tryLoadDatDirectory(filename);
+    });
+  }
+
+  {
+    auto *act = new QAction("Open a single bin file");
+    m_menuFile->addAction(act);
     act->setShortcut({Qt::CTRL | Qt::Key_O});
 
     connect(act, &QAction::triggered, this, [this]() {
-      const QString filename =
-          QFileDialog::getExistingDirectory(this, "Import DAT data directory");
-
-      this->tryLoadDatDirectory(filename);
+      const QString filename = QFileDialog::getOpenFileName(
+          this, "Select a bin file", defaultDataDir, "Binfile (*.bin *.dat)");
+      this->tryLoadBinfile(filename);
     });
   }
 
@@ -136,6 +176,21 @@ MainWindow::MainWindow()
     m_workerThread.start();
     QMetaObject::invokeMethod(m_worker, &ReconWorker::start);
   }
+
+  // DAQ Info
+  {
+#ifdef OCTGUI_HAS_ALAZAR
+    auto *actDaqInfo = new QAction("DAQ Info");
+    connect(actDaqInfo, &QAction::triggered, [this]() {
+      const auto daqInfo = daq::getDAQInfo();
+      QMessageBox::about(this, "DAQ Info", QString::fromStdString(daqInfo));
+    });
+    m_menuFile->addAction(actDaqInfo);
+#endif
+  }
+
+  // Auto load calibration data if exists at C:/Data/OCTcalib
+  tryLoadCalibDirectory("C:/Data/OCTcalib");
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -144,13 +199,8 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
     const auto &urls = mimeData->urls();
 
     if (urls.size() == 1) {
-      // Accept folder drop
-      const auto filePath = urls[0].toLocalFile();
-      QFileInfo fileInfo(filePath);
-
-      if (fileInfo.isDir()) {
-        event->acceptProposedAction();
-      }
+      // Accept single drop
+      event->acceptProposedAction();
     }
   }
 }
@@ -160,11 +210,10 @@ void MainWindow::dropEvent(QDropEvent *event) {
   if (mimeData->hasUrls()) {
     const auto &urls = mimeData->urls();
     const auto qpath = urls[0].toLocalFile();
-    const auto stdPath = toPath(qpath);
+    const auto path = toPath(qpath);
 
-    if (fs::is_directory(stdPath)) {
-
-      auto dirName = getDirectoryName(stdPath);
+    if (fs::is_directory(path)) {
+      auto dirName = getDirectoryName(path);
       toLower_(dirName);
       if (dirName.find("calib") != std::string::npos) {
         // Check if it is a calibration directory (a directory that contains
@@ -176,6 +225,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
         // Load Dat sequence directory
         tryLoadDatDirectory(qpath);
       }
+    } else {
+      tryLoadBinfile(qpath);
     }
   }
 }
@@ -185,17 +236,17 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   const auto backgroundFile = calibDirP / "SSOCTBackground.txt";
   const auto phaseFile = calibDirP / "SSOCTCalibration180MHZ.txt";
 
-  constexpr int statusTimeoutMs = 5000;
+  constexpr int statusTimeoutMs = 10000;
 
   if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
-    m_calib = std::make_shared<Calibration<Float>>(DatReader::ALineSize,
+    m_calib = std::make_shared<Calibration<Float>>(DatFileReader::ALineSize,
                                                    backgroundFile, phaseFile);
     const auto msg = QString("Loaded calibration files from ") + calibDir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_worker->setCalibration(m_calib);
 
-    if (m_datReader != nullptr) {
+    if (m_datReader.ok()) {
       loadFrame(m_frameController->pos());
     }
   } else {
@@ -205,54 +256,51 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   }
 }
 
-void MainWindow::tryLoadDatDirectory(const QString &dir) {
-  const auto dirp = toPath(dir);
-  m_datReader = std::make_unique<DatReader>(dirp);
+void MainWindow::tryLoadDatDirectory(const QString &qdir) {
+  m_datReader = DatFileReader::readDatDirectory(toPath(qdir));
 
   constexpr int statusTimeoutMs = 5000;
-  if (m_datReader->ok()) {
+  if (m_datReader.ok()) {
+    afterDatReaderReady();
 
     // Update status bar
-    const auto msg = QString("Loaded dat directory ") + dir;
-    statusBar()->showMessage(msg, statusTimeoutMs);
-
-    // Update image overlay sequence label
-    m_imageDisplay->overlay()->setSequence(
-        QString::fromStdString(m_datReader->seq));
-    m_imageDisplay->overlay()->setProgress(
-        0, static_cast<int>(m_datReader->size()));
-
-    // Update frame controller slider
-    m_frameController->setSize(m_datReader->size());
-    m_frameController->setPos(0);
-
-    // Set export directory
-    const auto exportDir = toPath(QStandardPaths::writableLocation(
-                               QStandardPaths::DesktopLocation)) /
-                           m_datReader->seq;
-    m_exportSettingsWidget->setExportDir(exportDir);
-    fs::create_directories(exportDir);
-
-    // Ensure the ring buffers have enough storage
-    const auto fringeSize = m_datReader->samplesPerFrame();
-    m_ringBuffer->forEach([fringeSize](std::shared_ptr<OCTData<Float>> &dat) {
-      dat->fringe.resize(fringeSize);
-    });
+    statusBar()->showMessage("Loaded dat directory " + qdir);
 
     // Load the first frame
     loadFrame(0);
 
   } else {
-    const auto msg = QString("Failed to load dat directory ") + dir;
+    const auto msg = QString("Failed to load dat directory ") + qdir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_exportSettingsWidget->setExportDir({});
-    m_datReader = nullptr;
+    m_datReader = {};
   }
 }
 
+void MainWindow::tryLoadBinfile(const QString &qpath) {
+  m_datReader = DatFileReader::readBinFile(toPath(qpath));
+
+  constexpr int statusTimeoutMs = 5000;
+  if (m_datReader.ok()) {
+    afterDatReaderReady();
+
+    // Update status bar
+    statusBarMessage("Loaded bin file " + qpath);
+
+    // Load the first frame
+    loadFrame(0);
+
+  } else {
+    statusBarMessage("Failed to load bin file " + qpath);
+
+    m_exportSettingsWidget->setExportDir({});
+    m_datReader = {};
+  }
+};
+
 void MainWindow::loadFrame(size_t i) {
-  if (m_calib != nullptr && m_datReader != nullptr) {
+  if (m_calib != nullptr && m_datReader.ok()) {
     TimeIt timeit;
 
     // Recon
@@ -267,13 +315,13 @@ void MainWindow::loadFrame(size_t i) {
     }
 
     // Read the current fringe data
-    i = std::clamp<size_t>(i, 0, m_datReader->size());
+    i = std::clamp<size_t>(i, 0, m_datReader.size());
 
     m_ringBuffer->produce([&, this](std::shared_ptr<OCTData<Float>> &dat) {
       dat->i = i;
-      if (auto err = m_datReader->read(i, 1, dat->fringe); err) {
+      if (auto err = m_datReader.read(i, 1, dat->fringe); err) {
         const auto msg = fmt::format("While loading {}/{}, got {}", i,
-                                     m_datReader->size(), *err);
+                                     m_datReader.size(), *err);
         QMetaObject::invokeMethod(this, &MainWindow::statusBarMessage,
                                   QString::fromStdString(msg));
         return;
@@ -294,4 +342,29 @@ MainWindow::~MainWindow() {
   m_workerThread.wait();
 }
 
+void MainWindow::afterDatReaderReady() {
+
+  // Update image overlay sequence label
+  m_imageDisplay->overlay()->setSequence(
+      QString::fromStdString(m_datReader.seq()));
+  m_imageDisplay->overlay()->setProgress(0,
+                                         static_cast<int>(m_datReader.size()));
+
+  // Update frame controller slider
+  m_frameController->setSize(m_datReader.size());
+  m_frameController->setPos(0);
+
+  // Set export directory
+  const auto exportDir = toPath(QStandardPaths::writableLocation(
+                             QStandardPaths::DesktopLocation)) /
+                         m_datReader.seq();
+  m_exportSettingsWidget->setExportDir(exportDir);
+  fs::create_directories(exportDir);
+
+  // Ensure the ring buffers have enough storage
+  const auto fringeSize = m_datReader.samplesPerFrame();
+  m_ringBuffer->forEach([fringeSize](std::shared_ptr<OCTData<Float>> &dat) {
+    dat->fringe.resize(fringeSize);
+  });
+};
 } // namespace OCT
