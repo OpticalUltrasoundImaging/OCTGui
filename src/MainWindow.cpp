@@ -176,6 +176,9 @@ MainWindow::MainWindow()
     m_menuFile->addAction(actDaqInfo);
 #endif
   }
+
+  // Auto load calibration data if exists at C:/Data/OCTcalib
+  tryLoadCalibDirectory("C:/Data/OCTcalib");
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -221,7 +224,7 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
   const auto backgroundFile = calibDirP / "SSOCTBackground.txt";
   const auto phaseFile = calibDirP / "SSOCTCalibration180MHZ.txt";
 
-  constexpr int statusTimeoutMs = 5000;
+  constexpr int statusTimeoutMs = 10000;
 
   if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
     m_calib = std::make_shared<Calibration<Float>>(DatFileReader::ALineSize,
