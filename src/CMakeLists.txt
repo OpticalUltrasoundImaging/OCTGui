@@ -77,6 +77,7 @@ target_link_libraries(${EXE_NAME} PRIVATE
     fmt::fmt
     Qt::Widgets
     Qt::Gui
+    Qt::SerialPort
     ${QCUSTOMPLOT_LIBRARY}
     opencv_world
     FFTW3::fftw3
