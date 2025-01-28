@@ -29,6 +29,7 @@
     },
     "qcustomplot",
     "qtbase",
+    "qtserialport",
     "tbb"
   ]
 }
