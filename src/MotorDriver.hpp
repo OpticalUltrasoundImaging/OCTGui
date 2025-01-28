@@ -20,10 +20,8 @@ The 3D motor has 1600 steps per revolution
 
 The probe rotates at 10 rps
 To achieve 50 um per frame,
-
 (500 um/rev) / (50 um / 0.1s) = 1 s / rev
-
-To achieve 100 um /s, or 100 per frame
+Set motor controller period to (1e6 sec / 1600 / 2) = 312.5 us
 
 Direction: Low is pull, high is push
 */
@@ -46,13 +44,13 @@ public:
       grid->addWidget(lbl, row, 0);
       grid->addWidget(m_cbPort, row, 1);
 
-      // connect(m_cbPort, &QComboBox::currentTextChanged, this,
-      //         [this](const QString &text) {
-      //           if (!text.isEmpty()) {
-      //             m_portName = text;
-      //             openPort();
-      //           }
-      //         });
+      connect(m_cbPort, &QComboBox::currentTextChanged, this,
+              [this](const QString &text) {
+                if (!text.isEmpty()) {
+                  m_portName = text;
+                  openPort();
+                }
+              });
     }
 
     {
@@ -94,8 +92,10 @@ public:
 
     // Refresh ports BEFORE error handler connects so no error is shown at the
     // start
-    refreshPorts();
+    m_btnDir->setChecked(false);
+    m_btnRunStop->setChecked(false);
     setControlsEnabled(false);
+    refreshPorts(); // Port will automatically be opened here if available
 
     // Error handling
     {
@@ -106,16 +106,6 @@ public:
           },
           Qt::QueuedConnection);
     }
-
-    m_btnDir->setChecked(false);
-    m_btnRunStop->setChecked(false);
-
-    // Setup serial port
-    openPort();
-
-    handleDirectionButton(false);
-    handleRunStopButton(false);
-    setPeriod(m_period_us);
   };
 
   bool refreshPorts() {
@@ -150,7 +140,10 @@ public Q_SLOTS:
         return false;
       }
 
-      setDirection(m_direction);
+      qDebug() << "Open port: " << resp;
+
+      handleDirectionButton(false);
+      handleRunStopButton(false);
       setPeriod(m_period_us);
 
       setControlsEnabled(true);
