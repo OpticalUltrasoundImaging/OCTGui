@@ -53,6 +53,7 @@ public:
   void setShouldStopAcquiring() { shouldStopAcquiring = true; }
 
   void setSaveData(bool save) noexcept { m_saveData = save; }
+  bool isSavingData() const noexcept { return m_saveData; }
   void setSaveDir(fs::path savedir) noexcept { m_savedir = std::move(savedir); }
   const fs::path &binpath() const noexcept { return m_lastBinfile; }
   const std::string &errMsg() const noexcept { return m_errMsg; }

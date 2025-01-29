@@ -22,13 +22,19 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
   if (daqSuccess) {
     Q_EMIT sigAcquisitionStarted();
 
-    daqSuccess = m_daq.acquire(params.maxFrames, {});
-  }
+    while (m_acquiring) {
+      daqSuccess = m_daq.acquire(params.maxFrames, {});
+      if (!daqSuccess) {
+        const auto &daqErr = "DAQ error: " + m_daq.errMsg();
+        if (!daqErr.empty()) {
+          Q_EMIT error(QString::fromStdString(daqErr));
+        }
+        break;
+      }
 
-  if (!daqSuccess) {
-    const auto &daqErr = "DAQ error: " + m_daq.errMsg();
-    if (!daqErr.empty()) {
-      Q_EMIT error(QString::fromStdString(daqErr));
+      if (m_daq.isSavingData()) {
+        m_acquiring = false;
+      }
     }
   }
 
@@ -80,6 +86,9 @@ AcquisitionController::AcquisitionController(
     connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionStarted,
             this, [this]() {
               this->setEnabled(true);
+              m_sbMaxFrames->setEnabled(false);
+              m_btnSaveOrDisplay->setEnabled(false);
+
               m_btnStartStopAcquisition->setText("Stop");
               m_btnStartStopAcquisition->setStyleSheet("background-color: red");
             });
@@ -88,6 +97,9 @@ AcquisitionController::AcquisitionController(
     connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionFinished,
             this, [this](const QString &filepath) {
               this->setEnabled(true);
+              m_sbMaxFrames->setEnabled(true);
+              m_btnSaveOrDisplay->setEnabled(true);
+
               m_btnStartStopAcquisition->setText("Start");
               m_btnStartStopAcquisition->setStyleSheet(
                   "background-color: green");
@@ -128,7 +140,7 @@ AcquisitionController::AcquisitionController(
     grid->addWidget(m_sbMaxFrames, 0, 1);
 
     m_sbMaxFrames->setMinimum(20);
-    m_sbMaxFrames->setMaximum(1000);
+    m_sbMaxFrames->setMaximum(2000);
     m_sbMaxFrames->setSingleStep(10);
     m_sbMaxFrames->setValue(m_acqParams.maxFrames);
 
