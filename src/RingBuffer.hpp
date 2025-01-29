@@ -6,6 +6,7 @@
 #include <fftconv/aligned_vector.hpp>
 #include <mutex>
 
+// NOLINTNEXTLINE(*-numbers)
 template <typename T, size_t Size = 8> class RingBuffer {
 public:
   using ValueType = std::shared_ptr<T>;

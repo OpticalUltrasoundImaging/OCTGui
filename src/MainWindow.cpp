@@ -28,8 +28,6 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <opencv2/opencv.hpp>
-#include <qdockwidget.h>
-#include <qnamespace.h>
 
 namespace OCT {
 
