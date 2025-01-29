@@ -149,14 +149,16 @@ AcquisitionController::AcquisitionController(
   }
 }
 
-AcquisitionController::~AcquisitionController() {}
-
-void AcquisitionController::closeEvent(QCloseEvent *event) {
+AcquisitionController::~AcquisitionController() {
   if (m_controllerThread.isRunning()) {
     m_controller.stopAcquisition();
     m_controllerThread.quit();
     m_controllerThread.wait();
   }
+}
+
+void AcquisitionController::closeEvent(QCloseEvent *event) {
+  QWidget::closeEvent(event);
 }
 
 } // namespace OCT

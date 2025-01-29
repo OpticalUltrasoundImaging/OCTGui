@@ -382,6 +382,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
   m_worker->setShouldStop(true);
   m_workerThread.quit();
   m_workerThread.wait();
+  QMainWindow::closeEvent(event);
 }
 
 MainWindow::~MainWindow() {}
