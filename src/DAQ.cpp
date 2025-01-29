@@ -25,13 +25,13 @@ namespace {
 // bool success{true};
 // NOLINTNEXTLINE(*-macro-usage)
 #define ALAZAR_CALL(fn)                                                        \
-  do {                                                                         \
+  {                                                                            \
     ret = fn;                                                                  \
     success = ret == ApiSuccess;                                               \
     if (!success) {                                                            \
       qCritical("Error: %s failed -- %s\n", #fn, AlazarErrorToText(ret));      \
     }                                                                          \
-  } while (0)
+  }
 
 // NOLINTNEXTLINE(*-macro-usage)
 #define RETURN_BOOL_IF_FAIL()                                                  \
@@ -383,13 +383,14 @@ bool DAQ::initHardware() noexcept {
   RETURN_BOOL_IF_FAIL();
 
   // External trigger channel (5V DC Coupling)
+  ALAZAR_CALL(AlazarSetExternalTrigger(board, DC_COUPLING, ETR_5V));
+  RETURN_BOOL_IF_FAIL();
+
+  // Trigger op
   ALAZAR_CALL(AlazarSetTriggerOperation(board, TRIG_ENGINE_OP_J, TRIG_ENGINE_J,
                                         TRIG_EXTERNAL, TRIGGER_SLOPE_NEGATIVE,
                                         160, TRIG_ENGINE_K, TRIG_DISABLE,
                                         TRIGGER_SLOPE_POSITIVE, 128));
-  RETURN_BOOL_IF_FAIL();
-
-  ALAZAR_CALL(AlazarSetExternalTrigger(board, DC_COUPLING, ETR_5V));
   RETURN_BOOL_IF_FAIL();
 
   ALAZAR_CALL(AlazarSetTriggerDelay(board, 0));
@@ -478,15 +479,14 @@ bool DAQ::acquire(int buffersToAcquire,
   U32 recordsPerAcquisition = recordsPerBuffer * buffersToAcquire;
   U32 admaFlags =
       ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_FIFO_ONLY_STREAMING;
-  const auto transferLength = recordSize * recordsPerBuffer;
-  ALAZAR_CALL(AlazarBeforeAsyncRead(board, channelMask, 0, transferLength,
+  ALAZAR_CALL(AlazarBeforeAsyncRead(board, channelMask, 0, recordSize,
                                     recordsPerBuffer, recordsPerAcquisition,
                                     admaFlags));
   RETURN_BOOL_IF_FAIL();
 
   // Add the buffers to a list of buffers available to be filled by the board
   for (auto &buf : buffers) {
-    auto bytesPerBuffer = buf.size() * sizeof(uint16_t);
+    const auto bytesPerBuffer = buf.size() * sizeof(uint16_t);
     ALAZAR_CALL(AlazarPostAsyncBuffer(board, buf.data(), bytesPerBuffer));
     RETURN_BOOL_IF_FAIL();
   }
