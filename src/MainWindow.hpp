@@ -45,6 +45,8 @@ protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
   void dropEvent(QDropEvent *event) override;
 
+  void closeEvent(QCloseEvent *event) override;
+
 private:
   QMenu *m_menuFile;
   QMenu *m_menuView;

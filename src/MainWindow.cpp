@@ -353,13 +353,6 @@ void MainWindow::loadFrame(size_t i) {
   }
 }
 
-MainWindow::~MainWindow() {
-  m_ringBuffer->quit();
-  m_worker->setShouldStop(true);
-  m_workerThread.quit();
-  m_workerThread.wait();
-}
-
 void MainWindow::afterDatReaderReady() {
 
   // Update image overlay sequence label
@@ -385,4 +378,13 @@ void MainWindow::afterDatReaderReady() {
     dat->fringe.resize(fringeSize);
   });
 };
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+  m_ringBuffer->quit();
+  m_worker->setShouldStop(true);
+  m_workerThread.quit();
+  m_workerThread.wait();
+}
+
+MainWindow::~MainWindow() {}
 } // namespace OCT
