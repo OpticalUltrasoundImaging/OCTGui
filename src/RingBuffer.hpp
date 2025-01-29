@@ -41,7 +41,7 @@ public:
     if (full) {
       tail = (tail + 1) % buffer.size();
     }
-    qDebug() << "Produce at head " << head;
+    // qDebug() << "Produce at head" << head;
     produceFunc(buffer[head]);
     head = (head + 1) % buffer.size();
     full = head == tail;
@@ -56,7 +56,7 @@ public:
     if (full) {
       tail = (tail + 1) % buffer.size();
     }
-    qDebug() << "Produce at head " << head;
+    // qDebug() << "Produce at head" << head;
     produceFunc(buffer[head]);
     head = (head + 1) % buffer.size();
     full = head == tail;
@@ -71,10 +71,23 @@ public:
     if (empty()) {
       return;
     }
-    qDebug() << "Consume at tail " << tail;
+    // qDebug() << "Consume at tail" << tail;
     consumeFunc(buffer[tail]);
     tail = (tail + 1) % buffer.size();
     full = false;
+  }
+
+  // `consumeFunc` should take `const T&` and read the value
+  template <typename Func> void consume_head(const Func &consumeFunc) {
+    std::unique_lock<std::mutex> lock(mutex);
+    notEmpty.wait(lock, [this]() { return !empty(); });
+    if (empty()) {
+      return;
+    }
+    // Consume at head - 1
+    const auto prevHead = (head - 1 + buffer.size()) % buffer.size();
+    // qDebug() << "Consume at prevHead" << prevHead;
+    consumeFunc(buffer[prevHead]);
   }
 
   bool empty() const { return (!full && (head == tail)); }

@@ -51,57 +51,65 @@ public Q_SLOTS:
     m_exportSettings = settings;
   }
 
+  // Set to true during live acquisition, and turn off when not live.
+  void setNoBlockMode(bool noBlock) { noBlockMode = noBlock; }
+
   void start() {
     assert(m_ringBuffer != nullptr);
 
-    while (!shouldStop) {
+    const auto consumeFunc = [this](std::shared_ptr<OCTData<Float>> &dat) {
+      if (m_calib == nullptr) {
+        Q_EMIT statusMessage("No calibration loaded!");
+        return;
+      }
 
-      m_ringBuffer->consume([this](std::shared_ptr<OCTData<Float>> &dat) {
-        if (m_calib == nullptr) {
-          Q_EMIT statusMessage("No calibration loaded!");
-          return;
-        }
+      if (dat == nullptr) {
+        return;
+      }
 
-        if (dat == nullptr) {
-          return;
-        }
+      TimeIt timeit;
+      float elapsedRecon{};
+      {
+        TimeIt timeitRecon;
+        dat->imgRect = reconBscan_splitSpectrum<Float>(*m_calib, dat->fringe,
+                                                       ALineSize, m_params);
+        elapsedRecon = timeitRecon.get_ms();
+      }
 
+      float elapsedRadial{};
+      {
         TimeIt timeit;
-        float elapsedRecon{};
-        {
-          TimeIt timeitRecon;
-          dat->imgRect = reconBscan_splitSpectrum<Float>(*m_calib, dat->fringe,
-                                                         ALineSize, m_params);
-          elapsedRecon = timeitRecon.get_ms();
-        }
+        makeRadialImage(dat->imgRect, dat->imgRadial, m_params.padTop);
+        elapsedRadial = timeit.get_ms();
+      }
 
-        float elapsedRadial{};
-        {
-          TimeIt timeit;
-          makeRadialImage(dat->imgRect, dat->imgRadial, m_params.padTop);
-          elapsedRadial = timeit.get_ms();
-        }
+      if (m_exportSettings.saveImages) {
+        exportImages(*dat);
+      }
 
-        if (m_exportSettings.saveImages) {
-          exportImages(*dat);
-        }
+      makeCombinedImage(*dat);
 
-        makeCombinedImage(*dat);
+      // Update image display
+      const QPixmap combinedPixmap = matToQPixmap(dat->imgCombined);
+      QMetaObject::invokeMethod(m_imageDisplay, &ImageDisplay::imshow,
+                                combinedPixmap);
+      QMetaObject::invokeMethod(m_imageDisplay->overlay(),
+                                &ImageOverlay::setProgress, dat->i, -1);
 
-        // Update image display
-        const QPixmap combinedPixmap = matToQPixmap(dat->imgCombined);
-        QMetaObject::invokeMethod(m_imageDisplay, &ImageDisplay::imshow,
-                                  combinedPixmap);
-        QMetaObject::invokeMethod(m_imageDisplay->overlay(),
-                                  &ImageOverlay::setProgress, dat->i, -1);
+      // Status message
+      const auto elapsedTotal = timeit.get_ms();
+      const auto msg =
+          fmt::format("Loaded frame {}, recon {:.3f} ms, total {:.3f} ms",
+                      dat->i, elapsedRecon, elapsedTotal);
+      Q_EMIT statusMessage(QString::fromStdString(msg));
+    };
 
-        // Status message
-        const auto elapsedTotal = timeit.get_ms();
-        const auto msg =
-            fmt::format("Loaded frame {}, recon {:.3f} ms, total {:.3f} ms",
-                        dat->i, elapsedRecon, elapsedTotal);
-        Q_EMIT statusMessage(QString::fromStdString(msg));
-      });
+    while (!shouldStop) {
+      if (noBlockMode) {
+        m_ringBuffer->consume_head(consumeFunc);
+      } else {
+        m_ringBuffer->consume(consumeFunc);
+      }
     }
   }
 
@@ -140,6 +148,7 @@ public Q_SLOTS:
 
 private:
   std::atomic<bool> shouldStop{false};
+  std::atomic<bool> noBlockMode{false};
 
   std::shared_ptr<RingBuffer<OCTData<Float>>> m_ringBuffer;
   std::shared_ptr<Calibration<Float>> m_calib;

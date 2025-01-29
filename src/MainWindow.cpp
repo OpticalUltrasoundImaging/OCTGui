@@ -117,12 +117,21 @@ MainWindow::MainWindow()
     // Acq signals
     connect(&m_acqController->controller(),
             &AcquisitionControllerObj::sigAcquisitionStarted, this, [this]() {
+              // Set reconWorker to live (no block) mode
+              m_worker->setNoBlockMode(true);
+
               // Clear overlay progress
               m_imageDisplay->overlay()->setProgress(0, 0);
             });
     connect(&m_acqController->controller(),
-            &AcquisitionControllerObj::sigAcquisitionFinished, this,
-            &MainWindow::tryLoadBinfile);
+            &AcquisitionControllerObj::sigAcquisitionFinished,
+            [this](const QString &qpath) {
+              // Return to blocking mode where every incoming frame is processed
+              m_worker->setNoBlockMode(false);
+              tryLoadBinfile(qpath);
+            }
+
+    );
   }
 
 #endif
