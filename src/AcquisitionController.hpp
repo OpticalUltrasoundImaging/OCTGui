@@ -66,6 +66,9 @@ public:
 
   const auto &controller() const { return m_controller; }
 
+protected:
+  void closeEvent(QCloseEvent *event) override;
+
 private:
   AcquisitionControllerObj m_controller;
   QThread m_controllerThread;

@@ -149,7 +149,9 @@ AcquisitionController::AcquisitionController(
   }
 }
 
-AcquisitionController::~AcquisitionController() {
+AcquisitionController::~AcquisitionController() {}
+
+void AcquisitionController::closeEvent(QCloseEvent *event) {
   if (m_controllerThread.isRunning()) {
     m_controller.stopAcquisition();
     m_controllerThread.quit();
