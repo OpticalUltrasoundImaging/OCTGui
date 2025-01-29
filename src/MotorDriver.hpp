@@ -2,6 +2,8 @@
 
 #include <QComboBox>
 #include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
@@ -32,68 +34,111 @@ public:
       : QWidget(parent), m_cbPort(new QComboBox), m_btnDir(new QPushButton),
         m_btnRunStop(new QPushButton), m_sbPeriod(new QSpinBox) {
 
-    auto *_layout = new QVBoxLayout;
-    setLayout(_layout);
-    auto *grid = new QGridLayout;
-    _layout->addLayout(grid);
+    auto *hlayout = new QHBoxLayout;
+    setLayout(hlayout);
 
-    int row = 0;
+    auto *leftLayout = new QVBoxLayout;
+    auto *rightLayout = new QVBoxLayout;
+    hlayout->addLayout(leftLayout);
+    hlayout->addLayout(rightLayout);
 
+    // Serial port UI
     {
-      auto *lbl = new QLabel("Serial port:");
-      grid->addWidget(lbl, row, 0);
-      grid->addWidget(m_cbPort, row, 1);
+      m_gbSerialPort = new QGroupBox("Serial port");
+      leftLayout->addWidget(m_gbSerialPort);
+      auto *grid = new QGridLayout;
+      m_gbSerialPort->setLayout(grid);
 
-      connect(m_cbPort, &QComboBox::currentTextChanged, this,
-              [this](const QString &text) {
-                if (!text.isEmpty()) {
-                  m_portName = text;
-                  openPort();
-                }
-              });
+      int row = 0;
+
+      {
+        auto *lbl = new QLabel("Serial port:");
+        grid->addWidget(lbl, row, 0);
+        grid->addWidget(m_cbPort, row, 1);
+
+        connect(m_cbPort, &QComboBox::currentTextChanged, this,
+                [this](const QString &text) {
+                  if (!text.isEmpty()) {
+                    m_portName = text;
+                    openPort();
+                  }
+                });
+      }
+      row++;
+
+      {
+        auto *btn = new QPushButton("Connect");
+        connect(btn, &QPushButton::clicked, this, &MotorDriver::openPort);
+        grid->addWidget(btn, row, 0);
+      }
+
+      {
+        auto *btn = new QPushButton("Refresh ports");
+        connect(btn, &QPushButton::clicked, this, &MotorDriver::refreshPorts);
+        grid->addWidget(btn, row, 1);
+      }
     }
 
+    // 3D motor control UI
     {
-      auto *btn = new QPushButton("Connect");
-      connect(btn, &QPushButton::clicked, this, &MotorDriver::openPort);
-      grid->addWidget(btn, row++, 2);
+      m_gb3DMotor = new QGroupBox("3D motor");
+      rightLayout->addWidget(m_gb3DMotor);
+      auto *grid = new QGridLayout;
+      m_gb3DMotor->setLayout(grid);
+      int row = 0;
+
+      {
+        auto *lbl = new QLabel("Period (us):");
+        grid->addWidget(lbl, row, 0);
+        grid->addWidget(m_sbPeriod, row, 1);
+
+        m_sbPeriod->setRange(0, 1e6); // NOLINT(*-numbers)
+        m_sbPeriod->setValue(m_period_us);
+
+        connect(m_sbPeriod, &QSpinBox::editingFinished,
+                [this]() { setPeriod(m_sbPeriod->value()); });
+      }
+
+      {
+        grid->addWidget(m_btnDir, row, 2);
+        grid->addWidget(m_btnRunStop, row, 3);
+
+        m_btnDir->setCheckable(true);
+        connect(m_btnDir, &QPushButton::clicked, this,
+                &MotorDriver::handleDirectionButton);
+
+        m_btnRunStop->setCheckable(true);
+        connect(m_btnRunStop, &QPushButton::clicked, this,
+                &MotorDriver::handleRunStopButton);
+      }
     }
 
+    // Rotary motor control UI
     {
-      auto *lbl = new QLabel("Period (us):");
-      grid->addWidget(lbl, row, 0);
-      grid->addWidget(m_sbPeriod, row, 1);
+      m_gbRotaryMotor = new QGroupBox("Rotary motor");
+      rightLayout->addWidget(m_gbRotaryMotor);
+      auto *grid = new QGridLayout;
+      m_gbRotaryMotor->setLayout(grid);
+      int row = 0;
 
-      m_sbPeriod->setRange(0, 1e6); // NOLINT(*-numbers)
-      m_sbPeriod->setValue(m_period_us);
+      {
+        auto *btn = new QPushButton("Start rotation");
+        grid->addWidget(btn, 0, 0);
 
-      connect(m_sbPeriod, &QSpinBox::editingFinished,
-              [this]() { setPeriod(m_sbPeriod->value()); });
-    }
-
-    {
-      auto *btn = new QPushButton("Refresh ports");
-      connect(btn, &QPushButton::clicked, this, &MotorDriver::refreshPorts);
-      grid->addWidget(btn, row++, 2);
-    }
-
-    {
-      grid->addWidget(m_btnDir, row, 1);
-      grid->addWidget(m_btnRunStop, row, 2);
-
-      m_btnDir->setCheckable(true);
-      connect(m_btnDir, &QPushButton::clicked, this,
-              &MotorDriver::handleDirectionButton);
-
-      m_btnRunStop->setCheckable(true);
-      connect(m_btnRunStop, &QPushButton::clicked, this,
-              &MotorDriver::handleRunStopButton);
+        btn->setCheckable(true);
+        connect(btn, &QPushButton::clicked, [this, btn](bool checked) {
+          rotaryEnable(checked);
+          if (checked) {
+            btn->setText("Stop rotation");
+          } else {
+            btn->setText("Start rotation");
+          }
+        });
+      }
     }
 
     // Refresh ports BEFORE error handler connects so no error is shown at the
     // start
-    m_btnDir->setChecked(false);
-    m_btnRunStop->setChecked(false);
     setControlsEnabled(false);
     refreshPorts(); // Port will automatically be opened here if available
 
@@ -106,7 +151,7 @@ public:
           },
           Qt::QueuedConnection);
     }
-  };
+  }
 
   bool refreshPorts() {
     const auto infos = QSerialPortInfo::availablePorts();
@@ -123,6 +168,9 @@ Q_SIGNALS:
   void error(QString msg);
 
 public Q_SLOTS:
+  /*
+  Serial port
+  */
   bool openPort() {
     if (m_port.isOpen()) {
       m_port.close();
@@ -159,10 +207,13 @@ public Q_SLOTS:
   }
 
   void setControlsEnabled(bool enabled) {
-    m_btnDir->setEnabled(enabled);
-    m_btnRunStop->setEnabled(enabled);
+    m_gb3DMotor->setEnabled(enabled);
+    m_gbRotaryMotor->setEnabled(enabled);
   }
 
+  /*
+  3D motor control
+  */
   void handleDirectionButton(bool checked) {
     m_btnDir->setText(checked ? "Pushing" : "Pulling");
     if (m_port.isOpen()) {
@@ -213,6 +264,17 @@ public Q_SLOTS:
     }
   }
 
+  /*
+  Rotary motor control
+  */
+  void rotaryEnable(const bool enabled) {
+    if (m_port.isOpen()) {
+      m_rotaryEnabled = enabled;
+      const auto resp = writeRequest(enabled ? "m0\n" : "m1\n");
+      qDebug() << "rotaryEnable: " << resp;
+    }
+  }
+
 private:
   // Serial port
   QString m_portName;
@@ -220,15 +282,22 @@ private:
   QSerialPort::BaudRate m_BaudRate{QSerialPort::Baud115200};
 
   // UI
+  QGroupBox *m_gbRotaryMotor;
+  QGroupBox *m_gb3DMotor;
+  QGroupBox *m_gbSerialPort;
+
   QComboBox *m_cbPort;
   QPushButton *m_btnDir;
   QPushButton *m_btnRunStop;
   QSpinBox *m_sbPeriod;
 
-  // Variables
+  // Variables for 3D motor
   bool m_running{false};
   bool m_direction{false};
   int m_period_us{312};
+
+  // Variables for rotary motor
+  bool m_rotaryEnabled{false};
 
   // Buffers
   QByteArray m_respData;
