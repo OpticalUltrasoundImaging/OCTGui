@@ -54,6 +54,7 @@ private:
   ImageDisplay *m_imageDisplay;
   FrameController *m_frameController;
   OCTReconParamsController *m_reconParamsController;
+  MotorDriver *m_motorDriver;
 
 #ifdef WIN32
   QString defaultDataDir{"C:/Data/"};

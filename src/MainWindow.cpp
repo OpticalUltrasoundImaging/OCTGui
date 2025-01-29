@@ -101,10 +101,13 @@ MainWindow::MainWindow()
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
 
+  m_motorDriver = new MotorDriver;
+
 #ifdef OCTGUI_HAS_ALAZAR
+  m_acqController = new AcquisitionController(m_ringBuffer, m_motorDriver);
+
   // Acquisition
   {
-    m_acqController = new AcquisitionController(m_ringBuffer);
 
     auto *dock = new QDockWidget("Acquisition control");
     addDockWidget(Qt::TopDockWidgetArea, dock);
@@ -133,9 +136,9 @@ MainWindow::MainWindow()
   }
 
 #endif
+
   // Motor Driver
   {
-    auto *m_motorDriver = new MotorDriver;
     auto *dock = new QDockWidget("Motor control");
     addDockWidget(Qt::TopDockWidgetArea, dock);
     m_menuView->addAction(dock->toggleViewAction());

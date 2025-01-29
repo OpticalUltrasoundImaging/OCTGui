@@ -23,7 +23,8 @@ The 3D motor has 1600 steps per revolution
 The probe rotates at 10 rps
 To achieve 50 um per frame,
 (500 um/rev) / (50 um / 0.1s) = 1 s / rev
-Set motor controller period to (1e6 sec / 1600 / 2) = 312.5 us
+Set motor controller period to
+(1e6 usec / rev) / (2 * 1600 steps / rev) = 312.5 us
 
 Direction: Low is pull, high is push
 */

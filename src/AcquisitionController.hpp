@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "DAQ.hpp"
+#include "MotorDriver.hpp"
 #include "OCTData.hpp"
 #include "RingBuffer.hpp"
 #include <QGridLayout>
@@ -29,7 +30,8 @@ class AcquisitionControllerObj : public QObject {
   Q_OBJECT
 public:
   explicit AcquisitionControllerObj(
-      const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer);
+      const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
+      MotorDriver *motorDriver);
 
   auto &daq() { return m_daq; }
   bool isAcquiring() const { return m_acquiring; }
@@ -47,15 +49,18 @@ Q_SIGNALS:
   void error(QString msg);
 
 private:
-  daq::DAQ m_daq;
   std::atomic<bool> m_acquiring{false};
+
+  daq::DAQ m_daq;
+  MotorDriver *m_motorDriver;
 };
 
 class AcquisitionController : public QWidget {
   Q_OBJECT
 public:
   explicit AcquisitionController(
-      const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer);
+      const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
+      MotorDriver *motorDriver);
 
   AcquisitionController(const AcquisitionController &) = delete;
   AcquisitionController(AcquisitionController &&) = delete;
@@ -70,6 +75,7 @@ protected:
   void closeEvent(QCloseEvent *event) override;
 
 private:
+  // Acquisition controller obj run in separate thread
   AcquisitionControllerObj m_controller;
   QThread m_controllerThread;
 

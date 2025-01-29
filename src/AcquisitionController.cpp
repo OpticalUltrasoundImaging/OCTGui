@@ -1,3 +1,4 @@
+#include "MotorDriver.hpp"
 #ifdef OCTGUI_HAS_ALAZAR
 
 #include "AcquisitionController.hpp"
@@ -7,8 +8,9 @@
 namespace OCT {
 
 AcquisitionControllerObj::AcquisitionControllerObj(
-    const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer)
-    : m_daq(buffer) {}
+    const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
+    MotorDriver *motorDriver)
+    : m_daq(buffer), m_motorDriver(motorDriver) {}
 
 void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
   m_acquiring = true;
@@ -44,8 +46,10 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
 }
 
 AcquisitionController::AcquisitionController(
-    const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer)
-    : m_controller(buffer), m_btnStartStopAcquisition(new QPushButton("Start")),
+    const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
+    MotorDriver *motorDriver)
+    : m_controller(buffer, motorDriver),
+      m_btnStartStopAcquisition(new QPushButton("Start")),
       m_btnSaveOrDisplay(new QPushButton("Saving")), m_sbMaxFrames(new QSpinBox)
 
 {
