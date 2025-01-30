@@ -99,6 +99,7 @@ AcquisitionController::AcquisitionController(
 
       m_gbMode(new QGroupBox("Acquisition mode")),
 
+      m_btnAcquireBackgound(new QPushButton("Acquire background")),
       m_btnStartStopAcquisition(new QPushButton("Start")),
       m_btnSaveOrDisplay(new QPushButton("Saving")), m_sbMaxFrames(new QSpinBox)
 
@@ -154,9 +155,28 @@ AcquisitionController::AcquisitionController(
             [this](int val) { m_acqParams.maxFrames = val; });
   }
 
+  // Acquire background
   row++;
+  {
+    grid->addWidget(m_btnAcquireBackgound, row, 0, 1, 2);
+    connect(m_btnAcquireBackgound, &QPushButton::clicked, this, [this]() {
+      // Can only be clicked when not currently acquiring
+      this->setEnabled(false);
+
+      m_acquiringBackground = true;
+
+      // Only acquire 2 frames for background
+      AcquisitionParams acqBackgroundParams;
+      acqBackgroundParams.maxFrames = 2;
+
+      QMetaObject::invokeMethod(
+          &m_controller, &AcquisitionControllerObj::startAcquisition,
+          acqBackgroundParams, AcquisitionControllerObj::ModeManual);
+    });
+  }
 
   // Start/stop button
+  row++;
   {
     m_btnStartStopAcquisition->setStyleSheet("background-color: green");
     grid->addWidget(m_btnStartStopAcquisition, row, 0);
@@ -181,24 +201,40 @@ AcquisitionController::AcquisitionController(
     // State changed to running
     connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionStarted,
             this, [this]() {
-              this->setEnabled(true);
-              m_sbMaxFrames->setEnabled(false);
-              m_btnSaveOrDisplay->setEnabled(false);
+              if (m_acquiringBackground) {
+                // Acquiring background
+                // no op
+                m_btnAcquireBackgound->setStyleSheet("background-color: red");
 
-              m_btnStartStopAcquisition->setText("Stop");
-              m_btnStartStopAcquisition->setStyleSheet("background-color: red");
+              } else {
+                this->setEnabled(true);
+                m_sbMaxFrames->setEnabled(false);
+                m_btnSaveOrDisplay->setEnabled(false);
+
+                m_btnStartStopAcquisition->setText("Stop");
+                m_btnStartStopAcquisition->setStyleSheet(
+                    "background-color: red");
+              }
             });
 
     // State changed to stopped
     connect(&m_controller, &AcquisitionControllerObj::sigAcquisitionFinished,
             this, [this](const QString &filepath) {
               this->setEnabled(true);
-              m_sbMaxFrames->setEnabled(true);
-              m_btnSaveOrDisplay->setEnabled(true);
 
-              m_btnStartStopAcquisition->setText("Start");
-              m_btnStartStopAcquisition->setStyleSheet(
-                  "background-color: green");
+              if (m_acquiringBackground) {
+                // Acquiring background finished
+                m_acquiringBackground = false;
+                m_btnAcquireBackgound->setStyleSheet("");
+
+              } else {
+                m_sbMaxFrames->setEnabled(true);
+                m_btnSaveOrDisplay->setEnabled(true);
+
+                m_btnStartStopAcquisition->setText("Start");
+                m_btnStartStopAcquisition->setStyleSheet(
+                    "background-color: green");
+              }
             });
 
     connect(&m_controller, &AcquisitionControllerObj::error, this,

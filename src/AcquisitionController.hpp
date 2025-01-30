@@ -99,6 +99,11 @@ private:
   QGroupBox *m_gbMode;
   QButtonGroup *m_modeBtnGroup;
 
+  QPushButton *m_btnAcquireBackgound;
+  // If true, we are in "acquire background" mode. Otherwise, we're in regulard
+  // "start/stop" acquisition mode, regardless of saving or not
+  bool m_acquiringBackground{false};
+
   QPushButton *m_btnStartStopAcquisition;
   QPushButton *m_btnSaveOrDisplay;
 
