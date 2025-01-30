@@ -6,10 +6,10 @@
 #include "strOps.hpp"
 #include <QButtonGroup>
 #include <QComboBox>
-#include <QMap>
 #include <QMessageBox>
 #include <QMetaEnum>
 #include <QRadioButton>
+#include <QThread>
 
 namespace OCT {
 
@@ -39,6 +39,9 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params,
       // m_motorDriver->rotaryEnable(true);
       QMetaObject::invokeMethod(m_motorDriver, &MotorDriver::rotaryEnable,
                                 true);
+
+      // Wait 500ms for motor rotation to ramp up
+      QThread::msleep(500);
 
       // if 3D, turn on 3D motor pulling
       if (mode == Mode3D) {
