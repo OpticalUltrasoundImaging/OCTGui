@@ -3,7 +3,11 @@
 
 #include "AcquisitionController.hpp"
 #include "strOps.hpp"
+#include <QComboBox>
+#include <QMap>
 #include <QMessageBox>
+#include <QMetaEnum>
+#include <QRadioButton>
 
 namespace OCT {
 
@@ -49,6 +53,9 @@ AcquisitionController::AcquisitionController(
     const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
     MotorDriver *motorDriver)
     : m_controller(buffer, motorDriver),
+
+      m_gbMode(new QGroupBox("Acquisition mode")),
+
       m_btnStartStopAcquisition(new QPushButton("Start")),
       m_btnSaveOrDisplay(new QPushButton("Saving")), m_sbMaxFrames(new QSpinBox)
 
@@ -57,17 +64,55 @@ AcquisitionController::AcquisitionController(
   m_controller.moveToThread(&m_controllerThread);
   m_controllerThread.start(QThread::HighestPriority);
 
-  auto *layout = new QVBoxLayout;
+  auto *layout = new QHBoxLayout;
   setLayout(layout);
+
+  // Mode selection
+  {
+    auto *radioLayout = new QVBoxLayout;
+    m_gbMode->setLayout(radioLayout);
+    layout->addWidget(m_gbMode);
+
+    const auto metaEnum =
+        QMetaEnum::fromType<AcquisitionControllerObj::AcquisitionMode>();
+    for (int i = 0; i < metaEnum.keyCount(); ++i) {
+      QString text = metaEnum.valueToKey(metaEnum.value(i));
+      // Trim the "Mode" prefix from Mode enum names. E.g. "ModeFree" -> "Free"
+      auto *rbtn = new QRadioButton(text.mid(4));
+      radioLayout->addWidget(rbtn);
+      m_modeRadioBtns[metaEnum.value(i)] = rbtn;
+      if (i == 0)
+        rbtn->setChecked(true);
+    }
+  }
 
   auto *grid = new QGridLayout;
   layout->addLayout(grid);
+  int row = 0;
+
+  // Spinbox to set maxFrames
+  {
+    auto *lbl = new QLabel("Max frames");
+    grid->addWidget(lbl, row, 0);
+    grid->addWidget(m_sbMaxFrames, row, 1);
+
+    // NOLINTBEGIN(*-numbers)
+    m_sbMaxFrames->setMinimum(20);
+    m_sbMaxFrames->setMaximum(2000);
+    m_sbMaxFrames->setSingleStep(10);
+    // NOLINTEND(*-numbers)
+    m_sbMaxFrames->setValue(m_acqParams.maxFrames);
+
+    connect(m_sbMaxFrames, &QSpinBox::valueChanged,
+            [this](int val) { m_acqParams.maxFrames = val; });
+  }
+
+  row++;
 
   // Start/stop button
   {
-
     m_btnStartStopAcquisition->setStyleSheet("background-color: green");
-    grid->addWidget(m_btnStartStopAcquisition, 0, 2);
+    grid->addWidget(m_btnStartStopAcquisition, row, 0);
 
     connect(m_btnStartStopAcquisition, &QPushButton::clicked, this, [this]() {
       this->setEnabled(false);
@@ -117,7 +162,7 @@ AcquisitionController::AcquisitionController(
 
   // Save/display button
   {
-    grid->addWidget(m_btnSaveOrDisplay, 1, 2);
+    grid->addWidget(m_btnSaveOrDisplay, row, 1);
     m_btnSaveOrDisplay->setCheckable(true);
     connect(m_btnSaveOrDisplay, &QPushButton::toggled, this,
             [this](bool checked) {
@@ -135,21 +180,6 @@ AcquisitionController::AcquisitionController(
               }
             });
     m_btnSaveOrDisplay->setChecked(true);
-  }
-
-  // Spinbox to set maxFrames
-  {
-    auto *lbl = new QLabel("Max frames");
-    grid->addWidget(lbl, 0, 0);
-    grid->addWidget(m_sbMaxFrames, 0, 1);
-
-    m_sbMaxFrames->setMinimum(20);
-    m_sbMaxFrames->setMaximum(2000);
-    m_sbMaxFrames->setSingleStep(10);
-    m_sbMaxFrames->setValue(m_acqParams.maxFrames);
-
-    connect(m_sbMaxFrames, &QSpinBox::valueChanged,
-            [this](int val) { m_acqParams.maxFrames = val; });
   }
 }
 

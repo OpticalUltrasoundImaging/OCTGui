@@ -6,9 +6,12 @@
 #include "OCTData.hpp"
 #include "RingBuffer.hpp"
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QLabeL>
+#include <QMap>
 #include <QObject>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QSpinBox>
 #include <QString>
 #include <QThread>
@@ -28,7 +31,19 @@ struct AcquisitionParams {
 
 class AcquisitionControllerObj : public QObject {
   Q_OBJECT
+
 public:
+  /*
+  Support 3 acquisition modes:
+
+    1. Free: just run the DAQ (no automatic motors). Can manually control
+    motors
+    2. 2D: Automatically start/stop rotary motor
+    3. 3D: Automatically start/stop rotary and 3D motors
+  */
+  enum AcquisitionMode : std::uint8_t { ModeManual = 0, Mode2D, Mode3D };
+  Q_ENUM(AcquisitionMode);
+
   explicit AcquisitionControllerObj(
       const std::shared_ptr<RingBuffer<OCTData<Float>>> &buffer,
       MotorDriver *motorDriver);
@@ -80,6 +95,9 @@ private:
   QThread m_controllerThread;
 
   // UI
+  QGroupBox *m_gbMode;
+  QMap<int, QRadioButton *> m_modeRadioBtns;
+
   QPushButton *m_btnStartStopAcquisition;
   QPushButton *m_btnSaveOrDisplay;
 

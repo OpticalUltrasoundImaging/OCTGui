@@ -83,7 +83,8 @@ public:
     // 3D motor control UI
     {
       m_gb3DMotor = new QGroupBox("3D motor");
-      rightLayout->addWidget(m_gb3DMotor);
+      // rightLayout->addWidget(m_gb3DMotor);
+      hlayout->addWidget(m_gb3DMotor);
       auto *grid = new QGridLayout;
       m_gb3DMotor->setLayout(grid);
       int row = 0;
@@ -100,9 +101,10 @@ public:
                 [this]() { setPeriod(m_sbPeriod->value()); });
       }
 
+      row++;
       {
-        grid->addWidget(m_btnDir, row, 2);
-        grid->addWidget(m_btnRunStop, row, 3);
+        grid->addWidget(m_btnDir, row, 0);
+        grid->addWidget(m_btnRunStop, row, 1);
 
         m_btnDir->setCheckable(true);
         connect(m_btnDir, &QPushButton::clicked, this,
@@ -117,7 +119,8 @@ public:
     // Rotary motor control UI
     {
       m_gbRotaryMotor = new QGroupBox("Rotary motor");
-      rightLayout->addWidget(m_gbRotaryMotor);
+      // rightLayout->addWidget(m_gbRotaryMotor);
+      hlayout->addWidget(m_gbRotaryMotor);
       auto *grid = new QGridLayout;
       m_gbRotaryMotor->setLayout(grid);
       int row = 0;
@@ -295,7 +298,7 @@ private:
   // Variables for 3D motor
   bool m_running{false};
   bool m_direction{false};
-  int m_period_us{312};
+  int m_period_us{625};
 
   // Variables for rotary motor
   bool m_rotaryEnabled{false};

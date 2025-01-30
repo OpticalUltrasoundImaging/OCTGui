@@ -36,7 +36,7 @@ MainWindow::MainWindow()
       m_menuView(menuBar()->addMenu("&View")), m_imageDisplay(new ImageDisplay),
       m_frameController(new FrameController),
       m_reconParamsController(new OCTReconParamsController),
-
+      m_motorDriver(new MotorDriver),
       m_ringBuffer(std::make_shared<RingBuffer<OCTData<Float>>>()),
       m_worker(new ReconWorker(m_ringBuffer, DatFileReader::ALineSize,
                                m_imageDisplay)),
@@ -101,7 +101,11 @@ MainWindow::MainWindow()
     menuBar()->addMenu(m_exportSettingsWidget->menu());
   }
 
-  m_motorDriver = new MotorDriver;
+  // Motor Driver
+  auto *motorDock = new QDockWidget("Motor control");
+  addDockWidget(Qt::TopDockWidgetArea, motorDock);
+  m_menuView->addAction(motorDock->toggleViewAction());
+  motorDock->setWidget(m_motorDriver);
 
 #ifdef OCTGUI_HAS_ALAZAR
   m_acqController = new AcquisitionController(m_ringBuffer, m_motorDriver);
@@ -135,15 +139,14 @@ MainWindow::MainWindow()
     );
   }
 
-#endif
+  motorDock->show();
 
-  // Motor Driver
-  {
-    auto *dock = new QDockWidget("Motor control");
-    addDockWidget(Qt::TopDockWidgetArea, dock);
-    m_menuView->addAction(dock->toggleViewAction());
-    dock->setWidget(m_motorDriver);
-  }
+#else
+
+  // No DAQ, hide motor control by default
+  motorDock->hide();
+
+#endif
 
   // Other actions
   // -------------
