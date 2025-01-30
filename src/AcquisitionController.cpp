@@ -227,6 +227,8 @@ AcquisitionController::AcquisitionController(
                 m_acquiringBackground = false;
                 m_btnAcquireBackgound->setStyleSheet("");
 
+                // TODO convert acquired background from bin to calib directory
+
               } else {
                 m_sbMaxFrames->setEnabled(true);
                 m_btnSaveOrDisplay->setEnabled(true);

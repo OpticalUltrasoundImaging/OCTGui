@@ -254,15 +254,11 @@ void MainWindow::dropEvent(QDropEvent *event) {
 }
 
 void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
-  const auto calibDirP = toPath(calibDir);
-  const auto backgroundFile = calibDirP / "SSOCTBackground.txt";
-  const auto phaseFile = calibDirP / "SSOCTCalibration180MHZ.txt";
-
   constexpr int statusTimeoutMs = 10000;
+  m_calib = Calibration<Float>::fromCalibDir(DatFileReader::ALineSize,
+                                             toPath(calibDir));
 
-  if (fs::exists(backgroundFile) && fs::exists(phaseFile)) {
-    m_calib = std::make_shared<Calibration<Float>>(DatFileReader::ALineSize,
-                                                   backgroundFile, phaseFile);
+  if (m_calib != nullptr) {
     const auto msg = QString("Loaded calibration files from ") + calibDir;
     statusBar()->showMessage(msg, statusTimeoutMs);
 
@@ -271,6 +267,7 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
     if (m_datReader.ok()) {
       loadFrame(m_frameController->pos());
     }
+
   } else {
     const auto msg =
         QString("Failed to load calibration files from ") + calibDir;
