@@ -1,8 +1,10 @@
 #include "MotorDriver.hpp"
+#include <qobjectdefs.h>
 #ifdef OCTGUI_HAS_ALAZAR
 
 #include "AcquisitionController.hpp"
 #include "strOps.hpp"
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QMap>
 #include <QMessageBox>
@@ -16,7 +18,8 @@ AcquisitionControllerObj::AcquisitionControllerObj(
     MotorDriver *motorDriver)
     : m_daq(buffer), m_motorDriver(motorDriver) {}
 
-void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
+void AcquisitionControllerObj::startAcquisition(AcquisitionParams params,
+                                                AcquisitionMode mode) {
   m_acquiring = true;
   bool daqSuccess = true;
 
@@ -26,6 +29,28 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
   }
 
   if (daqSuccess) {
+
+    // Auto motor control
+    if (mode == Mode2D || mode == Mode3D) {
+      // m_motorDriver->setEnabled(false);
+      QMetaObject::invokeMethod(m_motorDriver, &MotorDriver::setEnabled, false);
+
+      // Start rotary motor
+      // m_motorDriver->rotaryEnable(true);
+      QMetaObject::invokeMethod(m_motorDriver, &MotorDriver::rotaryEnable,
+                                true);
+
+      // if 3D, turn on 3D motor pulling
+      if (mode == Mode3D) {
+        QMetaObject::invokeMethod(m_motorDriver,
+                                  &MotorDriver::handleDirectionButton, false);
+        QMetaObject::invokeMethod(m_motorDriver,
+                                  &MotorDriver::handleRunStopButton, true);
+        // m_motorDriver->handleDirectionButton(false);
+        // m_motorDriver->handleRunStopButton(true);
+      }
+    }
+
     Q_EMIT sigAcquisitionStarted();
 
     while (m_acquiring) {
@@ -41,6 +66,21 @@ void AcquisitionControllerObj::startAcquisition(AcquisitionParams params) {
       if (m_daq.isSavingData()) {
         m_acquiring = false;
       }
+    }
+
+    // Clean up auto motor control
+    if (mode == Mode2D || mode == Mode3D) {
+      // m_motorDriver->rotaryEnable(false);
+      QMetaObject::invokeMethod(m_motorDriver, &MotorDriver::rotaryEnable,
+                                false);
+
+      if (mode == Mode3D) {
+        // m_motorDriver->handleRunStopButton(false);
+        QMetaObject::invokeMethod(m_motorDriver,
+                                  &MotorDriver::handleRunStopButton, false);
+      }
+
+      QMetaObject::invokeMethod(m_motorDriver, &MotorDriver::setEnabled, true);
     }
   }
 
@@ -73,17 +113,21 @@ AcquisitionController::AcquisitionController(
     m_gbMode->setLayout(radioLayout);
     layout->addWidget(m_gbMode);
 
+    m_modeBtnGroup = new QButtonGroup(this);
+
     const auto metaEnum =
         QMetaEnum::fromType<AcquisitionControllerObj::AcquisitionMode>();
     for (int i = 0; i < metaEnum.keyCount(); ++i) {
-      QString text = metaEnum.valueToKey(metaEnum.value(i));
+      const auto val = metaEnum.value(i);
+      QString text = metaEnum.valueToKey(val);
       // Trim the "Mode" prefix from Mode enum names. E.g. "ModeFree" -> "Free"
       auto *rbtn = new QRadioButton(text.mid(4));
       radioLayout->addWidget(rbtn);
-      m_modeRadioBtns[metaEnum.value(i)] = rbtn;
-      if (i == 0)
-        rbtn->setChecked(true);
+      m_modeBtnGroup->addButton(rbtn, val);
     }
+
+    m_modeBtnGroup->button(AcquisitionControllerObj::ModeManual)
+        ->setChecked(true);
   }
 
   auto *grid = new QGridLayout;
@@ -127,7 +171,7 @@ AcquisitionController::AcquisitionController(
         m_btnStartStopAcquisition->setText("Starting");
         QMetaObject::invokeMethod(&m_controller,
                                   &AcquisitionControllerObj::startAcquisition,
-                                  m_acqParams);
+                                  m_acqParams, selectedMode());
       }
     });
 

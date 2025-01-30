@@ -5,6 +5,7 @@
 #include "MotorDriver.hpp"
 #include "OCTData.hpp"
 #include "RingBuffer.hpp"
+#include <QButtonGroup>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabeL>
@@ -18,6 +19,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <memory>
+
 
 #ifdef OCTGUI_HAS_ALAZAR
 
@@ -50,7 +52,7 @@ public:
 
   auto &daq() { return m_daq; }
   bool isAcquiring() const { return m_acquiring; }
-  void startAcquisition(AcquisitionParams params);
+  void startAcquisition(AcquisitionParams params, AcquisitionMode mode);
 
   void stopAcquisition() {
     m_acquiring = false;
@@ -96,7 +98,7 @@ private:
 
   // UI
   QGroupBox *m_gbMode;
-  QMap<int, QRadioButton *> m_modeRadioBtns;
+  QButtonGroup *m_modeBtnGroup;
 
   QPushButton *m_btnStartStopAcquisition;
   QPushButton *m_btnSaveOrDisplay;
@@ -104,6 +106,11 @@ private:
   // Acquisition params
   AcquisitionParams m_acqParams;
   QSpinBox *m_sbMaxFrames;
+
+  AcquisitionControllerObj::AcquisitionMode selectedMode() const {
+    return static_cast<AcquisitionControllerObj::AcquisitionMode>(
+        m_modeBtnGroup->checkedId());
+  }
 };
 } // namespace OCT
 

@@ -218,6 +218,7 @@ public Q_SLOTS:
   /*
   3D motor control
   */
+  // Direction button, false = pull, true = push
   void handleDirectionButton(bool checked) {
     m_btnDir->setText(checked ? "Pushing" : "Pulling");
     if (m_port.isOpen()) {
@@ -242,6 +243,7 @@ public Q_SLOTS:
     }
   }
 
+  // Run or stop the 3D motor. Updates the button text
   void handleRunStopButton(bool checked) {
     if (checked) {
       m_btnRunStop->setText("Stop");
