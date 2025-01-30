@@ -20,14 +20,13 @@
 #include <QWidget>
 #include <memory>
 
-
 #ifdef OCTGUI_HAS_ALAZAR
 
 namespace OCT {
 
 // NOLINTBEGIN(*-magic-numbers)
 struct AcquisitionParams {
-  int maxFrames = 400;
+  int maxFrames = 200;
 };
 // NOLINTEND(*-magic-numbers)
 
