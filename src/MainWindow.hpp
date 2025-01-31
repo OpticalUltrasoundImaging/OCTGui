@@ -19,7 +19,6 @@
 #include <QThread>
 #include <memory>
 
-
 #ifdef OCTGUI_HAS_ALAZAR
 #include "AcquisitionController.hpp"
 #endif
@@ -59,16 +58,12 @@ private:
 
 #ifdef WIN32
   QString defaultDataDir{"C:/Data/"};
-#else
-  QString defaultDataDir{"~/data/"};
-#endif
-  DatFileReader m_datReader;
-
-#ifdef WIN32
   QString defaultCalibDir{"C:/Data/OCTcalib"};
 #else
+  QString defaultDataDir{"~/data/"};
   QString defaultCalibDir{"~/data/OCTcalib"};
 #endif
+  DatFileReader m_datReader;
   std::shared_ptr<Calibration<Float>> m_calib;
 
   // ring buffer for reading fringes
