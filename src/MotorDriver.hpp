@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -23,7 +24,8 @@ The 3D motor has 1600 steps per revolution
 The probe rotates at 10 rps
 To achieve 50 um per frame,
 (500 um/rev) / (50 um / 0.1s) = 1 s / rev
-Set motor controller period to (1e6 sec / 1600 / 2) = 312.5 us
+Set motor controller period to
+(1e6 usec / rev) / (2 * 1600 steps / rev) = 312.5 us
 
 Direction: Low is pull, high is push
 */
@@ -32,8 +34,8 @@ class MotorDriver : public QWidget {
 public:
   explicit MotorDriver(QWidget *parent = nullptr)
       : QWidget(parent), m_cbPort(new QComboBox), m_btnDir(new QPushButton),
-        m_btnRunStop(new QPushButton), m_sbPeriod(new QSpinBox) {
-
+        m_btnRunStop(new QPushButton), m_sbPeriod(new QSpinBox),
+        m_sbSpeed(new QDoubleSpinBox) {
     auto *hlayout = new QHBoxLayout;
     setLayout(hlayout);
 
@@ -82,7 +84,8 @@ public:
     // 3D motor control UI
     {
       m_gb3DMotor = new QGroupBox("3D motor");
-      rightLayout->addWidget(m_gb3DMotor);
+      // rightLayout->addWidget(m_gb3DMotor);
+      hlayout->addWidget(m_gb3DMotor);
       auto *grid = new QGridLayout;
       m_gb3DMotor->setLayout(grid);
       int row = 0;
@@ -95,13 +98,40 @@ public:
         m_sbPeriod->setRange(0, 1e6); // NOLINT(*-numbers)
         m_sbPeriod->setValue(m_period_us);
 
-        connect(m_sbPeriod, &QSpinBox::editingFinished,
-                [this]() { setPeriod(m_sbPeriod->value()); });
+        connect(m_sbPeriod, &QSpinBox::editingFinished, [this]() {
+          const auto period = m_sbPeriod->value();
+          // Set period on the MCU
+          setPeriod(period);
+
+          // Update speed UI
+          m_sbSpeed->setValue(periodToSpeed(period));
+        });
       }
 
+      row++;
       {
-        grid->addWidget(m_btnDir, row, 2);
-        grid->addWidget(m_btnRunStop, row, 3);
+        auto *lbl = new QLabel("Speed (um/s)");
+        grid->addWidget(lbl, row, 0);
+        grid->addWidget(m_sbSpeed, row, 1);
+
+        m_sbSpeed->setRange(0, 1e6); // NOLINT(*-numbers)
+        m_sbSpeed->setValue(periodToSpeed(m_period_us));
+
+        connect(m_sbSpeed, &QSpinBox::editingFinished, [this]() {
+          const auto speed = m_sbSpeed->value();
+          const auto period = speedToPeriod(speed);
+
+          setPeriod(period);
+
+          // Update period UI
+          m_sbPeriod->setValue(period);
+        });
+      }
+
+      row++;
+      {
+        grid->addWidget(m_btnDir, row, 0);
+        grid->addWidget(m_btnRunStop, row, 1);
 
         m_btnDir->setCheckable(true);
         connect(m_btnDir, &QPushButton::clicked, this,
@@ -116,7 +146,8 @@ public:
     // Rotary motor control UI
     {
       m_gbRotaryMotor = new QGroupBox("Rotary motor");
-      rightLayout->addWidget(m_gbRotaryMotor);
+      // rightLayout->addWidget(m_gbRotaryMotor);
+      hlayout->addWidget(m_gbRotaryMotor);
       auto *grid = new QGridLayout;
       m_gbRotaryMotor->setLayout(grid);
       int row = 0;
@@ -214,6 +245,7 @@ public Q_SLOTS:
   /*
   3D motor control
   */
+  // Direction button, false = pull, true = push
   void handleDirectionButton(bool checked) {
     m_btnDir->setText(checked ? "Pushing" : "Pulling");
     if (m_port.isOpen()) {
@@ -238,6 +270,38 @@ public Q_SLOTS:
     }
   }
 
+  // Period [us] to translation speed [um / s]
+  static double periodToSpeed(int period) {
+    /*
+    Period [usec / 0.5 step] (half a microstep)
+    Translation Speed [um / sec]
+
+    StepPerRev [step / sec] = 2 / Period [usec / 0.5 step] * (1e6 [usec / sec])
+    RevolutionSpeed [rev / sec] = StepPerRev [step / sec] * 1 [rev] / (1600
+    [step])
+
+    Speed [um / s] = RevolutionSpeed [rev / sec] * translation rate [um / rev]
+    Speed [um / s] = RevolutionSpeed [rev / sec] * 500 [um / rev]
+
+    1 revolution of the micrometer is 0.5 mm translation
+    1600 microsteps per revolution
+    */
+
+    const auto StepPerRev = 2.0 / period * 1e6;
+    const auto RevSpeed = StepPerRev / 1600;
+    const auto Speed = RevSpeed * 500;
+    return Speed;
+  }
+
+  // Translation speed [um / s] to period [us]
+  static int speedToPeriod(double speed) {
+    const auto RevSpeed = speed / 500;
+    const auto StepPerRev = RevSpeed * 1600;
+    const auto Period = 2.0 / StepPerRev * 1e6;
+    return static_cast<int>(std::round(Period));
+  }
+
+  // Run or stop the 3D motor. Updates the button text
   void handleRunStopButton(bool checked) {
     if (checked) {
       m_btnRunStop->setText("Stop");
@@ -290,11 +354,12 @@ private:
   QPushButton *m_btnDir;
   QPushButton *m_btnRunStop;
   QSpinBox *m_sbPeriod;
+  QDoubleSpinBox *m_sbSpeed;
 
   // Variables for 3D motor
   bool m_running{false};
   bool m_direction{false};
-  int m_period_us{312};
+  int m_period_us{625};
 
   // Variables for rotary motor
   bool m_rotaryEnabled{false};

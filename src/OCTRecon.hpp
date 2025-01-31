@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Calibration.hpp"
 #include "Common.hpp"
 #include "phasecorr.hpp"
 #include "timeit.hpp"
@@ -7,10 +8,7 @@
 #include <fftconv/aligned_vector.hpp>
 #include <fftconv/fftw.hpp>
 #include <fftw3.h>
-#include <filesystem>
 #include <fmt/format.h>
-#include <fstream>
-#include <iostream>
 #include <numbers>
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/scalable_allocator.h>
@@ -24,52 +22,6 @@
 // NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers, *-reinterpret-cast)
 
 namespace OCT {
-
-namespace fs = std::filesystem;
-
-template <typename T>
-void readTextFileToArray(const fs::path &filename, std::span<T> dst) {
-  std::ifstream ifs(filename);
-  if (ifs.is_open()) {
-    T val{};
-    size_t i{};
-
-    while (ifs >> val && i < dst.size()) {
-      dst[i++] = val;
-    }
-
-    if (ifs.eof()) {
-      // std::cout << "Reached end of file " << filename << '\n';
-    } else if (ifs.fail()) {
-      std::cerr << "Failed to read value in file " << filename << '\n';
-    } else if (ifs.bad()) {
-      std::cerr << "Critical I/O error occured in file " << filename << '\n';
-    }
-  }
-}
-
-template <Floating T> struct phaseCalibUnit {
-  size_t idx;
-  T l_coeff;
-  T r_coeff;
-
-  friend std::istream &operator>>(std::istream &is,
-                                  phaseCalibUnit<T> &calibUnit) {
-    return is >> calibUnit.idx >> calibUnit.l_coeff >> calibUnit.r_coeff;
-  }
-};
-
-template <Floating T> struct Calibration {
-  fftconv::AlignedVector<T> background;
-  fftconv::AlignedVector<phaseCalibUnit<T>> phaseCalib;
-
-  Calibration(int n_samples, const fs::path &backgroundFile,
-              const fs::path &phaseFile)
-      : background(n_samples), phaseCalib(n_samples) {
-    readTextFileToArray<T>(backgroundFile, background);
-    readTextFileToArray<phaseCalibUnit<T>>(phaseFile, phaseCalib);
-  }
-};
 
 template <Floating T> struct OCTReconParams {
   int imageDepth = 624;

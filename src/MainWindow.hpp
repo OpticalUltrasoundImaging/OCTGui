@@ -5,7 +5,7 @@
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
-#include "OCTRecon.hpp"
+#include "MotorDriver.hpp"
 #include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
 #include "RingBuffer.hpp"
@@ -54,11 +54,14 @@ private:
   ImageDisplay *m_imageDisplay;
   FrameController *m_frameController;
   OCTReconParamsController *m_reconParamsController;
+  MotorDriver *m_motorDriver;
 
 #ifdef WIN32
   QString defaultDataDir{"C:/Data/"};
+  QString defaultCalibDir{"C:/Data/OCTcalib"};
 #else
   QString defaultDataDir{"~/data/"};
+  QString defaultCalibDir{"~/data/OCTcalib"};
 #endif
   DatFileReader m_datReader;
   std::shared_ptr<Calibration<Float>> m_calib;

@@ -9,10 +9,10 @@
 #include <QImage>
 #include <QObject>
 #include <QPixmap>
+#include <QtLogging>
 #include <atomic>
 #include <cstddef>
-#include <qobjectdefs.h>
-#include <qpixmap.h>
+#include <qdebug.h>
 #include <utility>
 
 namespace OCT {
@@ -58,50 +58,55 @@ public Q_SLOTS:
     assert(m_ringBuffer != nullptr);
 
     const auto consumeFunc = [this](std::shared_ptr<OCTData<Float>> &dat) {
-      if (m_calib == nullptr) {
-        Q_EMIT statusMessage("No calibration loaded!");
-        return;
-      }
+      try {
 
-      if (dat == nullptr) {
-        return;
-      }
+        if (m_calib == nullptr) {
+          Q_EMIT statusMessage("No calibration loaded!");
+          return;
+        }
 
-      TimeIt timeit;
-      float elapsedRecon{};
-      {
-        TimeIt timeitRecon;
-        dat->imgRect = reconBscan_splitSpectrum<Float>(*m_calib, dat->fringe,
-                                                       ALineSize, m_params);
-        elapsedRecon = timeitRecon.get_ms();
-      }
+        if (dat == nullptr) {
+          return;
+        }
 
-      float elapsedRadial{};
-      {
         TimeIt timeit;
-        makeRadialImage(dat->imgRect, dat->imgRadial, m_params.padTop);
-        elapsedRadial = timeit.get_ms();
+        float elapsedRecon{};
+        {
+          TimeIt timeitRecon;
+          dat->imgRect = reconBscan_splitSpectrum<Float>(*m_calib, dat->fringe,
+                                                         ALineSize, m_params);
+          elapsedRecon = timeitRecon.get_ms();
+        }
+
+        float elapsedRadial{};
+        {
+          TimeIt timeit;
+          makeRadialImage(dat->imgRect, dat->imgRadial, m_params.padTop);
+          elapsedRadial = timeit.get_ms();
+        }
+
+        if (m_exportSettings.saveImages) {
+          exportImages(*dat);
+        }
+
+        makeCombinedImage(*dat);
+
+        // Update image display
+        const QPixmap combinedPixmap = matToQPixmap(dat->imgCombined);
+        QMetaObject::invokeMethod(m_imageDisplay, &ImageDisplay::imshow,
+                                  combinedPixmap);
+        QMetaObject::invokeMethod(m_imageDisplay->overlay(),
+                                  &ImageOverlay::setProgress, dat->i, -1);
+
+        // Status message
+        const auto elapsedTotal = timeit.get_ms();
+        const auto msg =
+            fmt::format("Loaded frame {}, recon {:.3f} ms, total {:.3f} ms",
+                        dat->i, elapsedRecon, elapsedTotal);
+        Q_EMIT statusMessage(QString::fromStdString(msg));
+      } catch (std::exception &e) {
+        qDebug() << "Exception in ReconWorker consumeFunc" << e.what();
       }
-
-      if (m_exportSettings.saveImages) {
-        exportImages(*dat);
-      }
-
-      makeCombinedImage(*dat);
-
-      // Update image display
-      const QPixmap combinedPixmap = matToQPixmap(dat->imgCombined);
-      QMetaObject::invokeMethod(m_imageDisplay, &ImageDisplay::imshow,
-                                combinedPixmap);
-      QMetaObject::invokeMethod(m_imageDisplay->overlay(),
-                                &ImageOverlay::setProgress, dat->i, -1);
-
-      // Status message
-      const auto elapsedTotal = timeit.get_ms();
-      const auto msg =
-          fmt::format("Loaded frame {}, recon {:.3f} ms, total {:.3f} ms",
-                      dat->i, elapsedRecon, elapsedTotal);
-      Q_EMIT statusMessage(QString::fromStdString(msg));
     };
 
     while (!shouldStop) {
@@ -127,7 +132,6 @@ public Q_SLOTS:
   }
 
   static void makeCombinedImage(OCTData<Float> &dat) {
-
     dat.imgCombined = cv::Mat_<uint8_t>(dat.imgRadial.rows,
                                         dat.imgRadial.cols + dat.imgRect.cols);
 

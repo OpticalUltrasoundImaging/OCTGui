@@ -87,7 +87,7 @@ private:
   bool m_dirty{false};
 
   void updateGuiFromParams();
-  inline void paramsUpdatedInternal() {}
+  void paramsUpdatedInternal() {}
 };
 
 }; // namespace OCT
