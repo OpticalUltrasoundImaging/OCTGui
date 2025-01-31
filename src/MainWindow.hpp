@@ -5,7 +5,7 @@
 #include "FileIO.hpp"
 #include "FrameController.hpp"
 #include "ImageDisplay.hpp"
-#include "OCTRecon.hpp"
+#include "MotorDriver.hpp"
 #include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
 #include "RingBuffer.hpp"
@@ -18,6 +18,7 @@
 #include <QStatusBar>
 #include <QThread>
 #include <memory>
+
 
 #ifdef OCTGUI_HAS_ALAZAR
 #include "AcquisitionController.hpp"

@@ -283,7 +283,10 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_worker->setCalibration(m_calib);
+
+#ifdef OCTGUI_HAS_ALAZAR
     m_acqController->setCalibration(m_calib);
+#endif
 
     if (m_datReader.ok()) {
       loadFrame(m_frameController->pos());
