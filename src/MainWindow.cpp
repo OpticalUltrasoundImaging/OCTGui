@@ -9,6 +9,7 @@
 #include "OCTRecon.hpp"
 #include "OCTReconParamsController.hpp"
 #include "ReconWorker.hpp"
+#include "datetime.hpp"
 #include "strOps.hpp"
 #include "timeit.hpp"
 #include <QDockWidget>
@@ -27,6 +28,7 @@
 #include <fftconv/aligned_vector.hpp>
 #include <filesystem>
 #include <fmt/format.h>
+#include <fmt/std.h>
 #include <opencv2/opencv.hpp>
 
 namespace OCT {
@@ -128,15 +130,33 @@ MainWindow::MainWindow()
               // Clear overlay progress
               m_imageDisplay->overlay()->setProgress(0, 0);
             });
+
     connect(&m_acqController->controller(),
             &AcquisitionControllerObj::sigAcquisitionFinished,
             [this](const QString &qpath) {
               // Return to blocking mode where every incoming frame is processed
               m_worker->setNoBlockMode(false);
               tryLoadBinfile(qpath);
-            }
+            });
 
-    );
+    // Updated background
+    connect(m_acqController, &AcquisitionController::sigUpdatedBackground, this,
+            [this]() {
+              const auto defaultDataDirp = toPath(defaultDataDir);
+              const auto newPath =
+                  defaultDataDirp /
+                  fmt::format("OCTcalib {}",
+                              datetime::datetimeFormat("%Y%m%d%H%M%S"));
+
+              const auto defaultCalibDirp = toPath(defaultCalibDir);
+              m_calib->saveToNewCalibDir(defaultCalibDirp);
+              m_calib->saveToNewCalibDir(newPath);
+
+              const auto msg = fmt::format(
+                  "Saved new calibration files to {} and default calib dir {}",
+                  newPath, defaultCalibDirp);
+              statusBarMessage(QString::fromStdString(msg));
+            });
   }
 
   motorDock->show();
@@ -212,7 +232,7 @@ MainWindow::MainWindow()
   }
 
   // Auto load calibration data if exists at C:/Data/OCTcalib
-  tryLoadCalibDirectory("C:/Data/OCTcalib");
+  tryLoadCalibDirectory(defaultCalibDir);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -263,6 +283,7 @@ void MainWindow::tryLoadCalibDirectory(const QString &calibDir) {
     statusBar()->showMessage(msg, statusTimeoutMs);
 
     m_worker->setCalibration(m_calib);
+    m_acqController->setCalibration(m_calib);
 
     if (m_datReader.ok()) {
       loadFrame(m_frameController->pos());
@@ -343,7 +364,6 @@ void MainWindow::loadFrame(size_t i) {
                                      m_datReader.size(), *err);
         QMetaObject::invokeMethod(this, &MainWindow::statusBarMessage,
                                   QString::fromStdString(msg));
-        return;
       }
     });
 

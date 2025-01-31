@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Calibration.hpp"
 #include "Common.hpp"
 #include "DAQ.hpp"
 #include "MotorDriver.hpp"
@@ -87,10 +88,19 @@ public:
 
   const auto &controller() const { return m_controller; }
 
+  void setCalibration(std::shared_ptr<Calibration<Float>> calib) {
+    m_calib = std::move(calib);
+  }
+
+Q_SIGNALS:
+  void sigUpdatedBackground();
+
 protected:
   void closeEvent(QCloseEvent *event) override;
 
 private:
+  std::shared_ptr<Calibration<Float>> m_calib;
+
   // Acquisition controller obj run in separate thread
   AcquisitionControllerObj m_controller;
   QThread m_controllerThread;
@@ -103,6 +113,7 @@ private:
   // If true, we are in "acquire background" mode. Otherwise, we're in regulard
   // "start/stop" acquisition mode, regardless of saving or not
   bool m_acquiringBackground{false};
+  int m_framesToAcquireForBackground{2};
 
   QPushButton *m_btnStartStopAcquisition;
   QPushButton *m_btnSaveOrDisplay;

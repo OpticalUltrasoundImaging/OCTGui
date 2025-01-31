@@ -163,11 +163,14 @@ AcquisitionController::AcquisitionController(
       // Can only be clicked when not currently acquiring
       this->setEnabled(false);
 
+      // Make sure saving
+      m_btnSaveOrDisplay->setChecked(true);
+
       m_acquiringBackground = true;
 
       // Only acquire 2 frames for background
       AcquisitionParams acqBackgroundParams;
-      acqBackgroundParams.maxFrames = 2;
+      acqBackgroundParams.maxFrames = m_framesToAcquireForBackground;
 
       QMetaObject::invokeMethod(
           &m_controller, &AcquisitionControllerObj::startAcquisition,
@@ -227,7 +230,12 @@ AcquisitionController::AcquisitionController(
                 m_acquiringBackground = false;
                 m_btnAcquireBackgound->setStyleSheet("");
 
-                // TODO convert acquired background from bin to calib directory
+                // Convert acquired background from bin to calib directory
+                // Update background
+                m_calib->updateBackgroundFromBinfile(
+                    toPath(filepath), m_framesToAcquireForBackground);
+
+                Q_EMIT sigUpdatedBackground();
 
               } else {
                 m_sbMaxFrames->setEnabled(true);

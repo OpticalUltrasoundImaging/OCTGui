@@ -62,6 +62,12 @@ private:
   QString defaultDataDir{"~/data/"};
 #endif
   DatFileReader m_datReader;
+
+#ifdef WIN32
+  QString defaultCalibDir{"C:/Data/OCTcalib"};
+#else
+  QString defaultCalibDir{"~/data/OCTcalib"};
+#endif
   std::shared_ptr<Calibration<Float>> m_calib;
 
   // ring buffer for reading fringes

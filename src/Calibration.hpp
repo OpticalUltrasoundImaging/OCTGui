@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Common.hpp"
+#include "FileIO.hpp"
+#include <QDebug>
+#include <algorithm>
 #include <fftconv/aligned_vector.hpp>
 #include <filesystem>
 #include <fstream>
@@ -39,7 +42,8 @@ void writeArrayToTextFile(const fs::path &filename,
   std::ofstream ofs(filename);
   if (ofs.is_open()) {
     for (const auto val : src) {
-      if (!(ofs << val << '\n')) {
+      ofs << val << '\n';
+      if (!ofs) {
         break;
       }
     }
@@ -57,9 +61,13 @@ template <Floating T> struct phaseCalibUnit {
   T l_coeff;
   T r_coeff;
 
-  friend std::istream &operator>>(std::istream &is,
-                                  phaseCalibUnit<T> &calibUnit) {
-    return is >> calibUnit.idx >> calibUnit.l_coeff >> calibUnit.r_coeff;
+  friend std::istream &operator>>(std::istream &is, phaseCalibUnit<T> &x) {
+    return is >> x.idx >> x.l_coeff >> x.r_coeff;
+  }
+
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const phaseCalibUnit<T> &x) {
+    return os << x.idx << ' ' << x.l_coeff << ' ' << x.r_coeff << '\n';
   }
 };
 
@@ -86,13 +94,49 @@ template <Floating T> struct Calibration {
   }
 
   void saveToNewCalibDir(const fs::path &newCalibDir) const {
-    fs::create_directory(newCalibDir);
+    if (!fs::exists(newCalibDir)) {
+      fs::create_directory(newCalibDir);
+    }
 
     const auto backgroundFile = newCalibDir / "SSOCTBackground.txt";
     const auto phaseFile = newCalibDir / "SSOCTCalibration180MHZ.txt";
 
-    writeArrayToTextFile(backgroundFile, background);
-    writeArrayToTextFile(phaseFile, phaseCalib);
+    writeArrayToTextFile<T>(backgroundFile, background);
+    writeArrayToTextFile<phaseCalibUnit<T>>(phaseFile, phaseCalib);
+  }
+
+  // Read a data bin, calculate background from the first n frames.
+  void updateBackgroundFromBinfile(const fs::path &path, int nFrames) {
+    auto reader = DatFileReader::readBinFile(path);
+    nFrames = std::min<size_t>(nFrames, reader.size());
+
+    const auto samples = reader.samplesPerFrame() * nFrames;
+    fftconv::AlignedVector<uint16_t> fringe(samples);
+
+    if (const auto err = reader.read(0, nFrames, fringe)) {
+      qDebug() << "While reading background bin, got" << err;
+    } else {
+      // Read successful
+      const auto ALineSize = DatFileReader::ALineSize;
+      const auto nLines = fringe.size() / ALineSize;
+
+      // Compute average
+      fftconv::AlignedVector<double> acc(ALineSize, 0);
+      for (size_t j = 0; j < nLines; ++j) {
+        const auto offset = j * ALineSize;
+        for (size_t i = 0; i < ALineSize; ++i) {
+          acc[i] += fringe[offset + i];
+        }
+      }
+
+      const auto fct = 1.0 / static_cast<double>(nLines);
+      for (auto &val : acc) {
+        val *= fct;
+      }
+
+      // Update background
+      std::copy(acc.begin(), acc.end(), background.begin());
+    }
   }
 };
 
