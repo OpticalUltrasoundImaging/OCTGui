@@ -13,6 +13,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <chrono>
 #include <fmt/core.h>
 
 /**
@@ -391,7 +392,11 @@ private:
   // Response is always terminated by double new lines
   QString readResp(int timeout_ms = 1000) {
     QString resp;
-    while (true) {
+
+    using namespace std::chrono;
+    const auto startTime = steady_clock::now();
+    const milliseconds duration(timeout_ms);
+    while (steady_clock::now() - startTime < duration) {
       if (m_port.waitForReadyRead(timeout_ms)) {
         m_respData += m_port.readAll();
 
