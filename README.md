@@ -38,7 +38,7 @@ In CMake lingo this means CMake build's the build system (Ninja); with VCPKG int
 
 #### Windows
 
-Activate the Visual Studio Developer PowerShell first, and run all commands inside the Developer PowerShell
+Activate the Visual Studio Developer PowerShell and run all commands inside the Developer PowerShell
 
 3 CMake presets are provided for Windows
 
