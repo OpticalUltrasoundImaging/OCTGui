@@ -5,11 +5,11 @@ on:
       - "**/README.md"
 
 env:
-  USERNAME: kwsp
+  USERNAME: OpticalUltrasoundImaging
   VCPKG_ROOT: ${{ github.workspace }}/vcpkg
   VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-  FEED_URL: https://nuget.pkg.github.com/kwsp/index.json
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite;nuget,https://nuget.pkg.github.com/kwsp/index.json,readwrite"
+  FEED_URL: https://nuget.pkg.github.com/OpticalUltrasoundImaging/index.json
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite;nuget,https://nuget.pkg.github.com/OpticalUltrasoundImaging/index.json,readwrite"
 
 jobs:
   Build-x64-windows:
