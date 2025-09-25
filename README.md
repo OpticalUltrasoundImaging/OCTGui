@@ -20,7 +20,7 @@ Install Visual Studio, and in the installer, select "Desktop development with C+
 
 Install Xcode or command line tools for the Apple Clang compiler. Last I checked, Qt didn't build with Homebrew Clang.
 
-Install the [homebrew package manager](https://brew.sh/), then run the following command to install mono (a C# runtime required by VCPKG's NuGet integration), ninja (build system), llvm (for clang-tiy), and some other tools required to build the dependencies.
+Install the [homebrew package manager](https://brew.sh/), then run the following command to install mono (a C# runtime required by VCPKG's NuGet integration), ninja (build system), llvm (for clang-tidy), and some other tools required to build the dependencies.
 
 ```sh
 brew install mono ninja llvm
