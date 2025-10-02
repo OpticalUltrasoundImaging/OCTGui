@@ -101,7 +101,8 @@ AcquisitionController::AcquisitionController(
 
       m_btnAcquireBackgound(new QPushButton("Acquire background")),
       m_btnStartStopAcquisition(new QPushButton("Start")),
-      m_btnSaveOrDisplay(new QPushButton("Saving")), m_sbMaxFrames(new QSpinBox)
+      m_btnSaveOrDisplay(new QPushButton("Saving")),
+      m_sbMaxFrames(new QSpinBox), m_sbAscansPerBscan(new QSpinBox)
 
 {
 
@@ -143,6 +144,7 @@ AcquisitionController::AcquisitionController(
     auto *lbl = new QLabel("Max frames");
     grid->addWidget(lbl, row, 0);
     grid->addWidget(m_sbMaxFrames, row, 1);
+    lbl->setToolTip("Max number of Bscans to acquire.");
 
     // NOLINTBEGIN(*-numbers)
     m_sbMaxFrames->setMinimum(20);
@@ -153,6 +155,31 @@ AcquisitionController::AcquisitionController(
 
     connect(m_sbMaxFrames, &QSpinBox::valueChanged,
             [this](int val) { m_acqParams.maxFrames = val; });
+  }
+
+  // Spinbox to set Alines per bscan
+  row++;
+  {
+    auto *lbl = new QLabel("Alines per Bscan");
+    grid->addWidget(lbl, row, 0);
+    grid->addWidget(m_sbAscansPerBscan, row, 1);
+    lbl->setToolTip("Default 2200 is for the in vivo proximal driven probe.\n"
+                    "Currently only 2200 uses distortion correction.\n"
+                    "This value should equal to the SS sweep rate (20k) "
+                    "divided by rotations per second.\n"
+                    "For example, 20k sweep rate and 4 rps equals 5000.");
+
+    // NOLINTBEGIN(*-numbers)
+    m_sbAscansPerBscan->setMinimum(100);
+    m_sbAscansPerBscan->setMaximum(10000);
+    m_sbAscansPerBscan->setSingleStep(10);
+    // NOLINTEND(*-numbers)
+    m_sbAscansPerBscan->setValue(
+        static_cast<int>(m_controller.getRecordsPerBuffer()));
+
+    connect(m_sbAscansPerBscan, &QSpinBox::valueChanged, [this](int val) {
+      m_controller.setRecordsPerBuffer(static_cast<uint32_t>(val));
+    });
   }
 
   // Acquire background
@@ -212,6 +239,7 @@ AcquisitionController::AcquisitionController(
               } else {
                 this->setEnabled(true);
                 m_sbMaxFrames->setEnabled(false);
+                m_sbAscansPerBscan->setEnabled(false);
                 m_btnSaveOrDisplay->setEnabled(false);
 
                 m_btnStartStopAcquisition->setText("Stop");
@@ -239,6 +267,7 @@ AcquisitionController::AcquisitionController(
 
               } else {
                 m_sbMaxFrames->setEnabled(true);
+                m_sbAscansPerBscan->setEnabled(true);
                 m_btnSaveOrDisplay->setEnabled(true);
 
                 m_btnStartStopAcquisition->setText("Start");
