@@ -319,6 +319,7 @@ template <Floating T>
       // theoreticalALines = 2234;
       // Don't need distortion correction for the ex vivo probe.
     } else if (nLines == 2200) {
+      // Only use distortion correction for the proximal driven in vivo probe
       theoreticalALines = 2000;
 
       const cv::Size targetSize(theoreticalALines, mat.rows);

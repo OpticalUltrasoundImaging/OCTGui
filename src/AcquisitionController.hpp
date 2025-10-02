@@ -54,6 +54,10 @@ public:
   bool isAcquiring() const { return m_acquiring; }
   void startAcquisition(AcquisitionParams params, AcquisitionMode mode);
 
+  // Get and set A line size
+  uint32_t getRecordsPerBuffer() const { return m_daq.getRecordsPerBuffer(); }
+  void setRecordsPerBuffer(uint32_t val) { m_daq.setRecordsPerBuffer(val); }
+
   void stopAcquisition() {
     m_acquiring = false;
     m_daq.setShouldStopAcquiring();
@@ -121,6 +125,7 @@ private:
   // Acquisition params
   AcquisitionParams m_acqParams;
   QSpinBox *m_sbMaxFrames;
+  QSpinBox *m_sbAscansPerBscan;
 
   AcquisitionControllerObj::AcquisitionMode selectedMode() const {
     return static_cast<AcquisitionControllerObj::AcquisitionMode>(

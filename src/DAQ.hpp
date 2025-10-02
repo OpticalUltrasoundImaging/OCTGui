@@ -58,6 +58,10 @@ public:
   const fs::path &binpath() const noexcept { return m_lastBinfile; }
   const std::string &errMsg() const noexcept { return m_errMsg; }
 
+  // Get and set A line size
+  uint32_t getRecordsPerBuffer() const { return recordsPerBuffer; }
+  void setRecordsPerBuffer(uint32_t val) { recordsPerBuffer = val; }
+
 private:
   // Ring buffer
   std::shared_ptr<RingBuffer<OCTData<Float>>> m_ringBuffer;

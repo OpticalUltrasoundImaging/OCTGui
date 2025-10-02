@@ -193,21 +193,24 @@ private:
         const auto totalLines = samples / ALineSize;
 
         if (linesPerFrame == 0) {
+
           // NOLINTBEGIN(*-magic-numbers)
           if ((samples % 2500) == 0) {
             // Ex vivo probe data
             m_linesPerFrame = 2500;
-          }
-          if ((samples % 2200) == 0) {
+          } else if ((samples % 2200) == 0) {
             // In vivo probe data
             m_linesPerFrame = 2200;
+          } else {
+            throw std::exception("Unknown linesPerFrame.");
           }
+          // NOLINTEND(*-magic-numbers)
+
         } else {
           m_linesPerFrame = linesPerFrame;
         }
 
         m_framesPerFile = totalLines / m_linesPerFrame;
-        // NOLINTEND(*-magic-numbers)
       } else {
         std::cerr << "Invalid file size: " << samples
                   << ", not divisible by A line size " << ALineSize << ".\n";
