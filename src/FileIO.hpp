@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <exception>
 #include <filesystem>
 #include <fmt/format.h>
 #include <fstream>
@@ -10,6 +9,7 @@
 #include <optional>
 #include <regex>
 #include <span>
+#include <stdexcept>
 #include <string>
 
 namespace OCT {
@@ -202,7 +202,7 @@ private:
             // In vivo probe data
             m_linesPerFrame = 2200;
           } else {
-            throw std::exception("Unknown linesPerFrame.");
+            throw std::invalid_argument("Unknown linesPerFrame.");
           }
           // NOLINTEND(*-magic-numbers)
 
