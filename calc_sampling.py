@@ -4,7 +4,7 @@ import math
 fs = 180e6
 print(f"OCT system DAQ {fs=:.3g}")
 
-aline_size = 8192
+aline_size = 1024 * 6
 time_to_acquire = aline_size/fs
 max_aline_per_sec = 1/time_to_acquire
 print("Old laser:")
